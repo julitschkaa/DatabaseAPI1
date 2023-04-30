@@ -1,8 +1,10 @@
 from typing import Union, Optional
 
 import uvicorn
+from uuid import uuid4
 
 from fastapi import FastAPI, File, UploadFile
+from fastapi_sqlalchemy import DBSessionMiddleware, db
 
 from Datafile_API.bio_python_script import get_fastq_metrics
 from Datafile_API.simplesam_script import get_sam_metrics
