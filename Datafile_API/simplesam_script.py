@@ -13,6 +13,8 @@ def get_sam_metrics(filename):
         alignment = {}
         alignment["sequence_id"] = x.qname
         alignment["mapping_tags"] = x.tags
+        alignment["position_in_ref"] = x.pos
+        alignment["mapping_qual"] = x.mapq
         alignments.append(alignment)
 
     binary_results = {}

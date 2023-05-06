@@ -40,8 +40,8 @@ async def raw_data(raw_data: SchemaRaw_data):
 
 @app.post('/binary_result/', response_model=SchemaBinary_result)
 async def binary_result(binary_result: SchemaBinary_result):
-    db_binary_result = ModelRaw_data(sequence_id=binary_result.sequence_id, mapping_reference_file=binary_result.mapping_reference_file, binary_of_origin=binary_result.binary_of_origin,
-                        type=binary_result.type, value=binary_result.value)
+    db_binary_result = ModelRaw_data(sequence_id=binary_result.sequence_id,
+                        type=binary_result.type, name=binary_result.name, value=binary_result.value, file_id=file_name_and_uuid)
     db.session.add(db_binary_result)
     db.session.commit()
     return db_binary_result
@@ -110,19 +110,35 @@ async def sam(filepath: Union[str]):
                                                     file_uuid=uuid4())
     db.session.add(db_file_name_and_uuid)
     db.session.commit()
-    mapping_reference_file_id = db_file_name_and_uuid.id
+    sam_id = db_file_name_and_uuid.id
 
     entry_count = 0
     for alignment in binary_results["alignments"]:
+        db_binary_results = ModelBinary_results(sequence_id=alignment["sequence_id"],
+                                                type=type(alignment["position_in_ref"]),
+                                                name="position_in_ref",
+                                                value=alignment["position_in_ref"],
+                                                file_id=sam_id)
+        db.session.add(db_binary_results)
+        db.session.commit()
+        entry_count += 1
+
+        db_binary_results = ModelBinary_results(sequence_id=alignment["sequence_id"],
+                                                type=type(alignment["mapping_qual"]),
+                                                name="mapping_qual",
+                                                value=alignment["mapping_qual"],
+                                                file_id=sam_id)
+        db.session.add(db_binary_results)
+        db.session.commit()
+        entry_count += 1
+
         mapping_tags = alignment["mapping_tags"]
         for mapping_tag in mapping_tags:
-            if type(mapping_tags[mapping_tag]) is int:
                 db_binary_results = ModelBinary_results(sequence_id=alignment["sequence_id"],
-                                                        #mapping_reference_file=binary_results["mapping_reference_file"],
-                                                        mapping_reference_file=mapping_reference_file_id,# ffs i dont effing know why this insists on int here
-                                                        binary_of_origin=binary_results["binary_of_origin"],
-                                                        type=mapping_tag,
-                                                        value=mapping_tags[mapping_tag])
+                                                        type=type(mapping_tags[mapping_tag]),
+                                                        name=mapping_tag,
+                                                        value=mapping_tags[mapping_tag],
+                                                        file_id=sam_id)
                 db.session.add(db_binary_results)
                 db.session.commit()
                 entry_count +=1
