@@ -24,7 +24,7 @@ class Binary_results(Base) :
     value = Column(String)
     file_id = Column(Integer, ForeignKey('file_name_and_uuid.id'))
 
-    file_name_and_uuid = relationship('File_name_and_uuid.id')
+    file_name_and_uuid = relationship('File_name_and_uuid')
 
 
 class File_name_and_uuid(Base) :

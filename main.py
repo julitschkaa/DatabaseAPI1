@@ -32,7 +32,7 @@ async def root():
 
 @app.post('/raw_data/', response_model=SchemaRaw_data)
 async def raw_data(raw_data: SchemaRaw_data):
-    db_raw_data = ModelRaw_data(sequence_id=raw_data.sequence_id, sequence=raw_data.sequence, phred_quality=raw_data.phred_quality)
+    db_raw_data = ModelRaw_data(sequence_id=raw_data.sequence_id, sequence=raw_data.sequence, phred_quality=raw_data.phred_quality, file_id=raw_data.file_id)
     db.session.add(db_raw_data)
     db.session.commit()
     return db_raw_data
@@ -115,7 +115,7 @@ async def sam(filepath: Union[str]):
     entry_count = 0
     for alignment in binary_results["alignments"]:
         db_binary_results = ModelBinary_results(sequence_id=alignment["sequence_id"],
-                                                type=type(alignment["position_in_ref"]),
+                                                type=str(type(alignment["position_in_ref"])),
                                                 name="position_in_ref",
                                                 value=alignment["position_in_ref"],
                                                 file_id=sam_id)
@@ -124,7 +124,7 @@ async def sam(filepath: Union[str]):
         entry_count += 1
 
         db_binary_results = ModelBinary_results(sequence_id=alignment["sequence_id"],
-                                                type=type(alignment["mapping_qual"]),
+                                                type=str(type(alignment["mapping_qual"])),
                                                 name="mapping_qual",
                                                 value=alignment["mapping_qual"],
                                                 file_id=sam_id)
@@ -135,7 +135,7 @@ async def sam(filepath: Union[str]):
         mapping_tags = alignment["mapping_tags"]
         for mapping_tag in mapping_tags:
                 db_binary_results = ModelBinary_results(sequence_id=alignment["sequence_id"],
-                                                        type=type(mapping_tags[mapping_tag]),
+                                                        type=str(type(mapping_tags[mapping_tag])),
                                                         name=mapping_tag,
                                                         value=mapping_tags[mapping_tag],
                                                         file_id=sam_id)
