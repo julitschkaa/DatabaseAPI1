@@ -8,6 +8,7 @@ from fastapi_sqlalchemy import DBSessionMiddleware, db
 
 from Datafile_API.bio_python_script import get_fastq_metrics
 from Datafile_API.simplesam_script import get_sam_metrics
+from Datafile_API.kraken2_script import get_kraken_metrics
 from schema import Raw_data as SchemaRaw_data
 from schema import Binary_results as SchemaBinary_result
 from schema import File_name_and_uuid as SchemaFile_name_and_uuid
@@ -143,6 +144,33 @@ async def sam(filepath: Union[str]):
                 db.session.commit()
                 entry_count +=1
     return {"added %d entries from binary of choice to postgresdb", entry_count}
+
+@app.post('/kraken2/')
+async def kraken(filepath: Union[str]):
+
+    kraken_results = get_kraken_metrics(filepath)
+
+    file_name = filepath
+    db_file_name_and_uuid = ModelFile_name_and_uuid(file_name=file_name,
+                                                    file_uuid=uuid4())
+    db.session.add(db_file_name_and_uuid)
+    db.session.commit()
+    file_id = db_file_name_and_uuid.id
+    entry_count = 0
+
+    for classification in kraken_results:
+        for key in classification.keys():
+            if key != "sequence_id":
+                db_binary_results = ModelBinary_results(sequence_id=classification["sequence_id"],
+                                                        type=str(type(classification[key])),
+                                                        name= str(key),
+                                                        value= str(classification[key]),
+                                                        file_id=file_id)
+                db.session.add(db_binary_results)
+                db.session.commit()
+                entry_count += 1
+    return {"added " + str(entry_count) + "entries from binary of choice to postgresdb"}
+
 
 
 # To run locally
