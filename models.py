@@ -1,35 +1,46 @@
-import sqlalchemy.sql.sqltypes
-from sqlalchemy import Column, ForeignKey, Integer, String, Float
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+import uuid
 
-Base  = declarative_base()
+from pydantic import BaseModel, Field, EmailStr
+from bson import ObjectId
+from typing import Optional, List
 
-class Raw_data(Base):
-    __tablename__ = 'raw_data'
-    id  = Column(Integer, primary_key=True, index=True)#brauchht's das hier überhaupt wenn Pk=seq_id?
-    sequence_id = Column(String)
-    sequence = Column(String)
-    phred_quality = Column(String)
-    file_id = Column(Integer, ForeignKey('file_name_and_uuid.id'))
+"""MangoDB stores data as BSON. FastAPI encodes to JSON.
+BSON native ObjectId can't be directly encoded as JSON, 
+therefore ObjectId is converted to String _id """
+class PyObjectId(ObjectId):
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
 
-    file_name_and_uuid = relationship('File_name_and_uuid')
+    @classmethod
+    def validate(cls, v):
+        if not ObjectId.is_valid(v):
+            raise ValueError("Invalid objectid")
+        return ObjectId(v)
 
-class Binary_results(Base) :
-    __tablename__ = 'binary_results'
-    id = Column(Integer, primary_key=True, index=True)#same here ist das ding noetig??
-    sequence_id = Column(String)
-    type = Column(String)
-    name = Column(String)
-    value = Column(String)
-    file_id = Column(Integer, ForeignKey('file_name_and_uuid.id'))
+    @classmethod
+    def __modify_schema__(cls, field_schema):
+        field_schema.update(type="string")
+class ReadModel(BaseModel):
+    #__tablename__ = 'reads'
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")#aliased because pydantic otherwise assumes private variablebrauchht's das hier überhaupt wenn Pk=seq_id?
+    sequence_id : str = Field(...)
+    sequence : str = Field(...)
+    phred_quality : str = Field(...)
+    file_id_fastq : str = Field(...) #could be session id instead?
 
-    file_name_and_uuid = relationship('File_name_and_uuid')
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
 
+class Update_ReadModel(BaseModel):
+    file_id_sam: Optional[str]
+    type: Optional[str]
+    name: Optional[str]
+    value: Optional[str]
 
-class File_name_and_uuid(Base) :
-    __tablename__ = 'file_name_and_uuid'
-    id = Column(Integer, primary_key=True, index=True)
-    file_name = Column(String)
-    file_uuid = Column(String)
+    class Config:
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
 

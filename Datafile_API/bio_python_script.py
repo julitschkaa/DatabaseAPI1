@@ -10,10 +10,11 @@ import matplotlib.patches as patches
 def get_fastq_metrics(filename):
     fastq_parser = SeqIO.parse(open(filename, "rt"), "fastq")
     reads = list()
-    for record in fastq_parser:
-        read = {}
-        read["id"] = record.id
-        read["sequence"] = record.seq
-        read["phred_quality"] = record.letter_annotations["phred_quality"]
-        reads.append(read)
+    while len(reads)<20:
+        for record in fastq_parser:
+            read = {}
+            read["sequence_id"] = record.id
+            read["sequence"] = record.seq
+            read["phred_quality"] = record.letter_annotations["phred_quality"]
+            reads.append(read)
     return reads

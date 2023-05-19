@@ -1,10 +1,8 @@
 # DatabaseAPI1
-Python API that reads .fastq and .sam files into a PostgreSQL DB.
+Python API that reads .fastq reads into a Mongo-DB flatfile database and enhances them further with .sam file data and kraken2 classifications.
 Current ERD: 
-![three tables: raw-datatable, file-name-and-uuid-table and table for secondary data genereated by binaries](images/postgresV1.png "ERD for postgresDB")
+![one single table: sequence_id followed by further datapoints](images/postgresV1.png "ERD for postgresDB")
 
 to start:  
-1. start postgresql
-2. run ```alembic init alembic```
-3. ```alembic revision --autogenerate -m "New Migration"```
-4. ```uvicorn main:app --reload```
+1. start mongoDB
+2. ```uvicorn main:app --reload```

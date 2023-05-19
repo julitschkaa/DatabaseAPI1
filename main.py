@@ -1,20 +1,23 @@
-from typing import Union, Optional
+from pydantic import BaseModel, Field, EmailStr
 
 import uvicorn
 from uuid import uuid4
 
-from fastapi import FastAPI, File, UploadFile
-from fastapi_sqlalchemy import DBSessionMiddleware, db
+from fastapi import FastAPI, File, UploadFile, Body, HTTPException, status
+from fastapi.responses import Response, JSONResponse
+from fastapi.encoders import jsonable_encoder
+from bson import ObjectId
+from typing import Optional, List, Union
+import motor.motor_asyncio
 
 from Datafile_API.bio_python_script import get_fastq_metrics
 from Datafile_API.simplesam_script import get_sam_metrics
 from Datafile_API.kraken2_script import get_kraken_metrics
+
 from schema import Raw_data as SchemaRaw_data
 from schema import Binary_results as SchemaBinary_result
 from schema import File_name_and_uuid as SchemaFile_name_and_uuid
-from models import Raw_data as ModelRaw_data
-from models import Binary_results as ModelBinary_results
-from models import File_name_and_uuid as ModelFile_name_and_uuid
+from models import ReadModel as ReadModel, PyObjectId
 
 import os
 from dotenv import load_dotenv
@@ -22,83 +25,75 @@ from dotenv import load_dotenv
 load_dotenv('.env')
 
 app = FastAPI()
+client = motor.motor_asyncio.AsyncIOMotorClient(os.environ["MONGODB_URL"]) #async motor driver to create mongo client
+db = client.reads #specify database name 'reads'
 
 # to avoid csrftokenError
-app.add_middleware(DBSessionMiddleware, db_url=os.environ['DATABASE_URL'])
+#app.add_middleware(DBSessionMiddleware, db_url=os.environ['MONGODB_URL'])
 
 
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
 
-@app.post('/raw_data/', response_model=SchemaRaw_data)
-async def raw_data(raw_data: SchemaRaw_data):
-    db_raw_data = ModelRaw_data(sequence_id=raw_data.sequence_id, sequence=raw_data.sequence, phred_quality=raw_data.phred_quality, file_id=raw_data.file_id)
-    db.session.add(db_raw_data)
-    db.session.commit()
-    return db_raw_data
+@app.post('/read/', response_description="Add new Read", response_model=ReadModel)
+async def create_read(read: ReadModel = Body(...)):
+    read = jsonable_encoder(read)
+    new_read = await  db["reads"].insert_one(read)
+    created_read = await db["reads"].find_one({"_id":new_read.inserted_id})
+    return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_read)
+
+@app.get("/read/", response_description="list all reads", response_model=List[ReadModel])
+async def list_reads():
+    reads = await db["reads"].find().to_list(100)#hardcoded limit otherwise use skip and limit
+    return reads
 
 
-@app.post('/binary_result/', response_model=SchemaBinary_result)
-async def binary_result(binary_result: SchemaBinary_result):
-    db_binary_result = ModelRaw_data(sequence_id=binary_result.sequence_id,
-                        type=binary_result.type, name=binary_result.name, value=binary_result.value, file_id=file_name_and_uuid)
-    db.session.add(db_binary_result)
-    db.session.commit()
-    return db_binary_result
+@app.get("/{sequence_id}", response_description="get a specific read", response_model=ReadModel)
+async def get_read(sequence_id: Union[str]):#not sure if union is necessary here
+    if (read := await db["reads"].find_one({"sequence_id":sequence_id})) is not None:
+        return read
 
-@app.get('/sequence_id/')
-async def sequence_id(sequence_id: Union[str]):
-    raw_data = db.session.query(ModelRaw_data).all()
-    results = [read for read in raw_data if read.sequence_id==sequence_id]
-    #results = db.session.query(ModelRaw_data).filter(ModelRaw_data.sequence_id==dsequence_id).first() #it says first here because "maximum recursion  depth exceeded error" otherwise
-    return results
+    raise HTTPException(status_code=404, detail=f"read {sequence_id} not found in database")
 
-@app.get('/raw_data/')
-async def raw_data():
-    #raw_data = db.session.query(ModelRaw_data).all() #too many results
-    raw_data = db.session.query(ModelRaw_data).first() #just here because i needed a random sequence id
-    #raw_data = db.session.query(ModelRaw_data).count()
-    return raw_data
+@app.put("/{sequence_id}", response_description="add entries to a specific read", response_model=ReadModel)
+async def update_read(sequence_id: str, new_data: dict):
+    #new_data = {k: v for k, v in read.items() if v is not None}
+    if len(new_data) >= 1:
+        update_result = await db["reads"].update_one({"sequence_id": sequence_id}, {"$set": new_data})
 
+        if update_result.modified_count >= 1:
+            if ( updated_read := await db["reads"].find_one({"sequence_id":sequence_id})) is not None:
+                return updated_read
 
-@app.get('/binary_results/')
-async def binary_results(sequence_id: Union[str]):
-    binary_results = db.session.query(ModelBinary_results).all()
-    results = [x for x in binary_results if x.sequence_id==sequence_id]
-    return results
+    if (existing_read := await db["reads"].find_one({"sequence_id":sequence_id})) is not None:
+        return existing_read
 
+    raise HTTPException(status_code=404, detail=f"read {sequence_id} not found for update")
 
-@app.get('/file_name_and_uuid/')
-async def file_name_and_uuid():
-    file_name_and_uuids = db.session.query(ModelFile_name_and_uuid).all()
-    return file_name_and_uuids
+@app.delete("/{sequence_id}", response_description="Delete a read")
+async def delete_read(sequence_id: str):
+    delete_result = await db["reads"].delete_one({"sequence_id":id})
 
+    if delete_result.deleted_count ==1:
+        return JSONResponse(status_code=status.HTTP_204_NO_CONTENT)
 
-@app.post('/file_name_and_uuid/', response_model=SchemaFile_name_and_uuid)
-async def file_name_and_uuid(file_name_and_uuid: SchemaFile_name_and_uuid):
-    db_file_name_and_uuid = ModelFile_name_and_uuid(file_name=file_name_and_uuid.name, file_uuid=file_name_and_uuid.uuid)
-    db.session.add(db_file_name_and_uuid)
-    db.session.commit()
-    return db_file_name_and_uuid
-
+    raise HTTPException(status_code=404, detail=f"Read {sequence_id} not found for deletion")
 
 @app.post('/fastq/')
 async def fastq(filepath: Union[str]):
-    db_file_name_and_uuid = ModelFile_name_and_uuid(file_name=filepath,
-                                                    file_uuid=uuid4())
-    db.session.add(db_file_name_and_uuid)
-    db.session.commit()
-    fastq_id = db_file_name_and_uuid.id
+    file_id_fastq = uuid4()
 
     reads = get_fastq_metrics(filepath)
 
     for read in reads:
-        db_raw_data = ModelRaw_data(sequence_id=read["id"] , sequence=str(read["sequence"]),
-                                    phred_quality=read["phred_quality"],file_id=fastq_id)
-        db.session.add(db_raw_data)
-        db.session.commit()
-    return {"added %d reads to postgresdb", len(reads)}
+        await create_read(ReadModel(id=PyObjectId(),
+                              sequence_id=str(read["sequence_id"]),
+                              sequence=str(read["sequence"]),
+                              phred_quality=str(read["phred_quality"]),
+                              file_id_fastq=str(file_id_fastq)
+                              ))
+    return {"added ", len(reads), " reads to mangodb"}
 
 
 @app.post('/sam/')
@@ -106,44 +101,21 @@ async def sam(filepath: Union[str]):
 
     binary_results = get_sam_metrics(filepath)
 
-    file_name = binary_results["mapping_reference_file"]
-    db_file_name_and_uuid = ModelFile_name_and_uuid(file_name=file_name,
-                                                    file_uuid=uuid4())
-    db.session.add(db_file_name_and_uuid)
-    db.session.commit()
-    sam_id = db_file_name_and_uuid.id
+    #file_name = binary_results["mapping_reference_file"]
+    file_id_sam = uuid4()#na ob das so smart ist hier...
 
     entry_count = 0
     for alignment in binary_results["alignments"]:
-        db_binary_results = ModelBinary_results(sequence_id=alignment["sequence_id"],
-                                                type=str(type(alignment["position_in_ref"])),
-                                                name="position_in_ref",
-                                                value=alignment["position_in_ref"],
-                                                file_id=sam_id)
-        db.session.add(db_binary_results)
-        db.session.commit()
+        update_read(alignment["sequence_id"],alignment)
+        """update_read(Update_ReadModel(alignment["sequence_id"],
+                                     type=str(type(alignment["position_in_ref"])),
+                                     name="position_in_ref",
+                                     value=alignment["position_in_ref"],
+                                     file_id=file_id_sam
+                                     ))"""
         entry_count += 1
 
-        db_binary_results = ModelBinary_results(sequence_id=alignment["sequence_id"],
-                                                type=str(type(alignment["mapping_qual"])),
-                                                name="mapping_qual",
-                                                value=alignment["mapping_qual"],
-                                                file_id=sam_id)
-        db.session.add(db_binary_results)
-        db.session.commit()
-        entry_count += 1
-
-        mapping_tags = alignment["mapping_tags"]
-        for mapping_tag in mapping_tags:
-                db_binary_results = ModelBinary_results(sequence_id=alignment["sequence_id"],
-                                                        type=str(type(mapping_tags[mapping_tag])),
-                                                        name=mapping_tag,
-                                                        value=mapping_tags[mapping_tag],
-                                                        file_id=sam_id)
-                db.session.add(db_binary_results)
-                db.session.commit()
-                entry_count +=1
-    return {"added %d entries from binary of choice to postgresdb", entry_count}
+    return {"added ", entry_count, " reads to mangodb"}
 
 @app.post('/kraken2/')
 async def kraken(filepath: Union[str]):
@@ -151,15 +123,13 @@ async def kraken(filepath: Union[str]):
     kraken_results = get_kraken_metrics(filepath)
 
     file_name = filepath
-    db_file_name_and_uuid = ModelFile_name_and_uuid(file_name=file_name,
-                                                    file_uuid=uuid4())
-    db.session.add(db_file_name_and_uuid)
-    db.session.commit()
-    file_id = db_file_name_and_uuid.id
+    file_id_kraken2 = uuid4()#idk
+
     entry_count = 0
 
     for classification in kraken_results:
-        for key in classification.keys():
+        update_read(classification["sequence_id"],classification)
+        """for key in classification.keys():
             if key != "sequence_id":
                 db_binary_results = ModelBinary_results(sequence_id=classification["sequence_id"],
                                                         type=str(type(classification[key])),
@@ -167,8 +137,8 @@ async def kraken(filepath: Union[str]):
                                                         value= str(classification[key]),
                                                         file_id=file_id)
                 db.session.add(db_binary_results)
-                db.session.commit()
-                entry_count += 1
+                db.session.commit()"""
+        entry_count += 1
     return {"added " + str(entry_count) + "entries from binary of choice to postgresdb"}
 
 
