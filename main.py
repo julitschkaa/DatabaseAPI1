@@ -9,6 +9,7 @@ from fastapi.encoders import jsonable_encoder
 from bson import ObjectId
 from typing import Optional, List, Union
 import motor.motor_asyncio
+from pymongo.mongo_client import MongoClient
 
 from Datafile_API.bio_python_script import get_fastq_metrics
 from Datafile_API.simplesam_script import get_sam_metrics
@@ -25,7 +26,8 @@ from dotenv import load_dotenv
 load_dotenv('.env')
 
 app = FastAPI()
-client = motor.motor_asyncio.AsyncIOMotorClient(os.environ["MONGODB_URL"]) #async motor driver to create mongo client
+#client = motor.motor_asyncio.AsyncIOMotorClient(os.environ["MONGODB_URL"]) #async motor driver to create mongo client
+client = MongoClient(os.environ["MONGODB_URI"])
 db = client.reads #specify database name 'reads'
 
 # to avoid csrftokenError
@@ -39,19 +41,22 @@ async def root():
 @app.post('/read/', response_description="Add new Read", response_model=ReadModel)
 async def create_read(read: ReadModel = Body(...)):
     read = jsonable_encoder(read)
-    new_read = await  db["reads"].insert_one(read)
-    created_read = await db["reads"].find_one({"_id":new_read.inserted_id})
+    new_read = db["reads"].insert_one(read)
+    created_read = db["reads"].find_one({"_id":new_read.inserted_id})
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_read)
 
 @app.get("/read/", response_description="list all reads", response_model=List[ReadModel])
 async def list_reads():
-    reads = await db["reads"].find().to_list(100)#hardcoded limit otherwise use skip and limit
+    reads =[]
+    for read in db["reads"].find():
+        reads.append(read)
+    #reads = await db["reads"].find().to_list(100)#hardcoded limit otherwise use skip and limit
     return reads
 
 
-@app.get("/{sequence_id}", response_description="get a specific read", response_model=ReadModel)
+@app.get("/{sequence_id}", response_description="get a specific read", response_model=ReadModel)#read model not ideal here since additional data might be present in DB
 async def get_read(sequence_id: Union[str]):#not sure if union is necessary here
-    if (read := await db["reads"].find_one({"sequence_id":sequence_id})) is not None:
+    if (read := db["reads"].find_one({"sequence_id":sequence_id})) is not None:
         return read
 
     raise HTTPException(status_code=404, detail=f"read {sequence_id} not found in database")
@@ -71,12 +76,14 @@ async def update_read(sequence_id: str, new_data: dict):
 
     raise HTTPException(status_code=404, detail=f"read {sequence_id} not found for update")
 
-@app.delete("/{sequence_id}", response_description="Delete a read")
+@app.delete("/{sequence_id}", response_description="Delete a read") #bson.errors.InvalidDocument: cannot encode object: <built-in function id>, of type: <class 'builtin_function_or_method'>
+
 async def delete_read(sequence_id: str):
-    delete_result = await db["reads"].delete_one({"sequence_id":id})
+    delete_result = db["reads"].delete_one({"sequence_id":sequence_id})
 
     if delete_result.deleted_count ==1:
-        return JSONResponse(status_code=status.HTTP_204_NO_CONTENT)
+        return JSONResponse(status_code=status.HTTP_204_NO_CONTENT, content=f"deleted {sequence_id}")#RuntimeError: Response content longer than Content-Length
+
 
     raise HTTPException(status_code=404, detail=f"Read {sequence_id} not found for deletion")
 
@@ -115,7 +122,7 @@ async def sam(filepath: Union[str]):
                                      ))"""
         entry_count += 1
 
-    return {"added ", entry_count, " reads to mangodb"}
+    return {"added/updated ", entry_count, " reads to mangodb"}
 
 @app.post('/kraken2/')
 async def kraken(filepath: Union[str]):
