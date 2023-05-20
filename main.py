@@ -77,7 +77,6 @@ async def update_read(sequence_id: str, new_data: dict):
     raise HTTPException(status_code=404, detail=f"read {sequence_id} not found for update")
 
 @app.delete("/{sequence_id}", response_description="Delete a read") #bson.errors.InvalidDocument: cannot encode object: <built-in function id>, of type: <class 'builtin_function_or_method'>
-
 async def delete_read(sequence_id: str):
     delete_result = db["reads"].delete_one({"sequence_id":sequence_id})
 
