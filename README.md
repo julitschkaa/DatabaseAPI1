@@ -1,7 +1,7 @@
 # DatabaseAPI1
 Python API that reads .fastq and .sam files into a PostgreSQL DB.
 Current ERD: 
-![flatfile Datatable: reads from fastq (mandatory) optional: fields from sam file or kraken outut](images/mongoDBV2.png "ERD for mongoDB")
+![three entity RD for postgres set up. seperate tables for data from fastq reads, sam files as well as kraken output together, and file_id table](images/postgresV1.png "ERD for postgresDB")
 
 to start:  
 1. start postgresql
