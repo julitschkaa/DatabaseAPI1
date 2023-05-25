@@ -1,13 +1,14 @@
 from typing import Union, Optional
 
 import uvicorn
+import http3
 from uuid import uuid4
 
 from fastapi import FastAPI, File, UploadFile
 from fastapi_sqlalchemy import DBSessionMiddleware, db
 
-from Datafile_API.bio_python_script import get_fastq_metrics
-from Datafile_API.simplesam_script import get_sam_metrics
+from Datafile_API.fastq_parser import get_fastq_metrics
+from Datafile_API.sam_parser import get_sam_metrics
 from Datafile_API.kraken2_script import get_kraken_metrics
 from schema import Raw_data as SchemaRaw_data
 from schema import Binary_results as SchemaBinary_result
@@ -22,18 +23,52 @@ from dotenv import load_dotenv
 load_dotenv('.env')
 
 app = FastAPI()
+client = http3.AsyncClient()
 
 # to avoid csrftokenError
 app.add_middleware(DBSessionMiddleware, db_url=os.environ['DATABASE_URL'])
+
 
 
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
 
+@app.get("/binary_api/")
+async def call_binary_api(endpoint: str, filepath:  str):
+    binary_api_url= os.environ['BINARY_API_URL']
+    r = await client.get(url=binary_api_url+endpoint, params=filepath)
+    return r.content
+
+
+@app.post("/fastqlukas/")
+async def fastq(filepath: Union[str]):
+    db_file_name_and_uuid = ModelFile_name_and_uuid(file_name=filepath,
+                                                    file_uuid=uuid4())
+    db.session.add(db_file_name_and_uuid)
+    db.session.commit()
+    fastq_id = db_file_name_and_uuid.id
+
+
+    readsjson = call_binary_api("fastq_json/", filepath)
+
+    for read in readsjson:
+        db_raw_data = ModelRaw_data(sequence_id=read["id"] , sequence=str(read["sequence"]),
+                                    phred_quality=read["phred_quality"],file_id=fastq_id)
+        db.session.add(db_raw_data)
+        db.session.commit()
+    return {"added %d reads to postgresdb", len(readsjson)}
+
 @app.post('/raw_data/', response_model=SchemaRaw_data)
 async def raw_data(raw_data: SchemaRaw_data):
-    db_raw_data = ModelRaw_data(sequence_id=raw_data.sequence_id, sequence=raw_data.sequence, phred_quality=raw_data.phred_quality, file_id=raw_data.file_id)
+    db_raw_data = ModelRaw_data(sequence_id=raw_data.sequence_id,
+                                sequence=raw_data.sequence,
+                                sequence_length=raw_data.sequence_length,
+                                min_quality = raw_data.min_quality,
+                                max_quality = raw_data.max_quality,
+                                average_quality = raw_data.average_quality,
+                                phred_quality=raw_data.phred_quality,
+                                file_id=raw_data.file_id)
     db.session.add(db_raw_data)
     db.session.commit()
     return db_raw_data
@@ -42,7 +77,10 @@ async def raw_data(raw_data: SchemaRaw_data):
 @app.post('/binary_result/', response_model=SchemaBinary_result)
 async def binary_result(binary_result: SchemaBinary_result):
     db_binary_result = ModelRaw_data(sequence_id=binary_result.sequence_id,
-                        type=binary_result.type, name=binary_result.name, value=binary_result.value, file_id=file_name_and_uuid)
+                                     type=binary_result.type,
+                                     name=binary_result.name,
+                                     value=binary_result.value,
+                                     file_id=file_name_and_uuid)
     db.session.add(db_binary_result)
     db.session.commit()
     return db_binary_result
@@ -94,8 +132,14 @@ async def fastq(filepath: Union[str]):
     reads = get_fastq_metrics(filepath)
 
     for read in reads:
-        db_raw_data = ModelRaw_data(sequence_id=read["id"] , sequence=str(read["sequence"]),
-                                    phred_quality=read["phred_quality"],file_id=fastq_id)
+        db_raw_data = ModelRaw_data(sequence_id=read["id"] ,
+                                    sequence=str(read["sequence"]),
+                                    sequence_length=read["sequence_lenngth"],
+                                    min_quality=read["min_quality"],
+                                    max_quality=read["max_quality"],
+                                    average_quality=read["average_quality"],
+                                    phred_quality=read["phred_quality"],
+                                    file_id=fastq_id)
         db.session.add(db_raw_data)
         db.session.commit()
     return {"added %d reads to postgresdb", len(reads)}
@@ -175,4 +219,4 @@ async def kraken(filepath: Union[str]):
 
 # To run locally
 if __name__ == '__main__':
-    uvicorn.run(app, host='127.0.0.1', port=8000)
+    uvicorn.run(app, host='127.0.0.1', port=8080)

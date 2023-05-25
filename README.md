@@ -7,4 +7,4 @@ to start:
 1. start postgresql
 2. run ```alembic init alembic```
 3. ```alembic revision --autogenerate -m "New Migration"```
-4. ```uvicorn main:app --reload```
+4. ```uvicorn main:app --reload --port 8080```

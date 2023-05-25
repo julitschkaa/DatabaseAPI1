@@ -10,6 +10,10 @@ class Raw_data(Base):
     id  = Column(Integer, primary_key=True, index=True)#brauchht's das hier überhaupt wenn Pk=seq_id?
     sequence_id = Column(String)
     sequence = Column(String)
+    sequence_length = Column(Integer)#new
+    min_quality = Column(Integer)#new
+    max_quality = Column(Integer)#new
+    average_quality = Column(Float)#new
     phred_quality = Column(String)
     file_id = Column(Integer, ForeignKey('file_name_and_uuid.id'))
 
