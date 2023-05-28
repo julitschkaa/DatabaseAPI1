@@ -5,6 +5,6 @@ Current ERD:
 
 to start:  
 1. start postgresql
-2. run ```alembic init alembic```
-3. ```alembic revision --autogenerate -m "New Migration"```
+2. run ```alembic revision --autogenerate -m "New Migration"```
+3. ```alembic upgrade head```
 4. ```uvicorn main:app --reload --port 8080```
