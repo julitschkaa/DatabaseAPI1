@@ -1,7 +1,11 @@
+from typing import List
+
 import sqlalchemy.sql.sqltypes
 from sqlalchemy import Column, ForeignKey, Integer, String, Float
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped
+
+from schema import Binary_results
 
 Base  = declarative_base()
 
@@ -29,6 +33,7 @@ class Binary_results(Base) :
     file_id = Column(Integer, ForeignKey('file_name_and_uuid.id'))
 
     file_name_and_uuid = relationship('File_name_and_uuid')
+
 
 
 class File_name_and_uuid(Base) :
