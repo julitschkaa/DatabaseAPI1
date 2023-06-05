@@ -20,7 +20,7 @@ class Raw_data(Base):
     average_quality = Column(Float)#new
     phred_quality = Column(String)
     file_id = Column(Integer, ForeignKey('file_name_and_uuid.id'))
-
+    #smart would be to initialise this with an empty list of binary results, but alembic doesnt let me
     file_name_and_uuid = relationship('File_name_and_uuid')
 
 class Binary_results(Base) :

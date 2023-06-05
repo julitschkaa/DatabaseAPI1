@@ -139,7 +139,7 @@ async def create_file_name_and_uuid_entries(file_name_and_uuid: SchemaFile_name_
     return db_file_name_and_uuid
 
 
-@app.post('/fastq/', status_code=status.HTTP_201_CREATED)
+@app.post('/fastq/', status_code=status.HTTP_201_CREATED)#TODO: check if file is already in filename_and_uuid_table
 async def create_fastq_entries(filepath: Union[str]):
     db_file_name_and_uuid = ModelFile_name_and_uuid(file_name=filepath,
                                                     file_uuid=uuid4())
@@ -163,7 +163,7 @@ async def create_fastq_entries(filepath: Union[str]):
     return {"added "+str(len(reads))+" reads to postgresDB"}
 
 
-@app.post('/sam/', status_code=status.HTTP_201_CREATED)
+@app.post('/sam/', status_code=status.HTTP_201_CREATED)#TODO: check if file is already in filename_and_uuid_table
 async def create_sam_enries(filepath: Union[str]):
     binary_results = get_sam_metrics(filepath)
 
@@ -207,7 +207,7 @@ async def create_sam_enries(filepath: Union[str]):
     return {"added "+str(entry_count)+" entries from sam file to postgresdb"}
 
 
-@app.post('/kraken2/', status_code=status.HTTP_201_CREATED)
+@app.post('/kraken2/', status_code=status.HTTP_201_CREATED)#TODO: check if file is already in filename_and_uuid_table
 async def create_kraken_entries(filepath: Union[str]):
     kraken_results = get_kraken_metrics(filepath)
 
