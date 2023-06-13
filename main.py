@@ -71,17 +71,17 @@ async def get_read(sequence_id: Union[str]):#not sure if union is necessary here
 
 @app.put("/{sequence_id}", response_description="add entries to binary collection and to a specific read", response_model=ReadModel)
 async def add_binary_result(sequence_id: str, new_data: BinaryResultModel = Body(...)):
-    new_data: jsonable_encoder(new_data)
-    print(type(new_data))
-    #binary_result_collection = db.binary_results
+    new_data = jsonable_encoder(new_data)
 
     if (existing_read := db["reads"].find_one({"sequence_id":sequence_id})) is not None:
-        binary_result_id = db["binary_results"].insert_one(new_data).inserted_id
-        updated_result = db["reads"].update_one({"sequence_id": sequence_id},
-                                               {"$push": {"binary_results": binary_result_id}})
-        return JSONResponse(status_code=status.HTTP_201_CREATED, content=updated_result)
+        new_binary_result_id = db["binary_results"].insert_one(new_data).inserted_id
+        #new_binary_result_id = new_binary_result.inserted_id
+        updated_read = db["reads"].update_one({"sequence_id": sequence_id},
+                                               {"$push": {"binary_results": new_binary_result_id}})# might be smarter to add all binary results for one read first and den push many
+        new_result = db["reads"].find_one({"sequence_id":sequence_id})
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content=new_result)
 
-    raise HTTPException(status_code=404, detail=f"read {sequence_id} not found for update")
+    raise HTTPException(status_code=404, detail=f"read {sequence_id} not found in read-collection for update, therefore not added to binary_result collection either")
 
 @app.delete("/{sequence_id}", response_description="Delete a read") #bson.errors.InvalidDocument: cannot encode object: <built-in function id>, of type: <class 'builtin_function_or_method'>
 async def delete_read(sequence_id: str):
@@ -118,14 +118,9 @@ async def postfastq(filepath: Union[str]):
 async def sam(filepath: Union[str]):
 
     binary_results = get_sam_metrics(filepath)
-
-    #file_name = binary_results["mapping_reference_file"]
     file_id_sam = str(uuid4())#na ob das so smart ist hier...
-
     entry_count = 0
     for alignment in binary_results["alignments"]:
-        #await add_binary_results(alignment)
-        #await update_read(alignment["sequence_id"],alignment)
         await add_binary_result(alignment["sequence_id"], BinaryResultModel(
                                      sequence_id= alignment["sequence_id"],
                                      file_id=file_id_sam,
@@ -142,13 +137,13 @@ async def sam(filepath: Union[str]):
                           value=alignment["mapping_qual"],
                           ))
         entry_count += 1
-        for tag in alignment["mapping_tags"]:
+        for tag in alignment["mapping_tags"].items():
             await add_binary_result(alignment["sequence_id"], BinaryResultModel(
                               sequence_id=alignment["sequence_id"],
                               file_id=file_id_sam,
-                              type=str(type(tag)),
-                              name=tag,
-                              value=tag,
+                              type=str(type(tag[1])),#the sam.tags function ommits the type of tags :(
+                              name=str(tag[0]),
+                              value=str(tag[1]),
                               ))
             entry_count += 1
 
