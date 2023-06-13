@@ -70,11 +70,13 @@ async def get_read(sequence_id: Union[str]):#not sure if union is necessary here
     raise HTTPException(status_code=404, detail=f"read {sequence_id} not found in database")
 
 @app.put("/{sequence_id}", response_description="add entries to binary collection and to a specific read", response_model=ReadModel)
-async def add_binary_result(sequence_id: str, new_data: BinaryResultModel = Body(...)):
-    new_data = jsonable_encoder(new_data)
+async def add_binary_result(sequence_id: str, new_data: list[BinaryResultModel]):
+
+    #new_data = jsonable_encoder(new_data)
 
     if (existing_read := db["reads"].find_one({"sequence_id":sequence_id})) is not None:
-        new_binary_result_id = db["binary_results"].insert_one(new_data).inserted_id
+
+        new_binary_result_id = db["binary_results"].insert_many(new_data, ordered=True, bypass_document_validation=True).inserted_ids
         #new_binary_result_id = new_binary_result.inserted_id
         updated_read = db["reads"].update_one({"sequence_id": sequence_id},
                                                {"$push": {"binary_results": new_binary_result_id}})# might be smarter to add all binary results for one read first and den push many
@@ -117,37 +119,40 @@ async def postfastq(filepath: Union[str]):
 @app.post('/sam/')
 async def sam(filepath: Union[str]):
 
-    binary_results = get_sam_metrics(filepath)
+    all_binary_results = get_sam_metrics(filepath)
     file_id_sam = str(uuid4())#na ob das so smart ist hier...
-    entry_count = 0
-    for alignment in binary_results["alignments"]:
-        await add_binary_result(alignment["sequence_id"], BinaryResultModel(
-                                     sequence_id= alignment["sequence_id"],
-                                     file_id=file_id_sam,
-                                     type=str(type(alignment["position_in_ref"])),
-                                     name="position_in_ref",
-                                     value=alignment["position_in_ref"],
-                                     ))
-        entry_count += 1
-        await add_binary_result(alignment["sequence_id"], BinaryResultModel(
-                          sequence_id=alignment["sequence_id"],
-                          file_id=file_id_sam,
-                          type=str(type(alignment["mapping_qual"])),
-                          name="mapping_qual",
-                          value=alignment["mapping_qual"],
-                          ))
-        entry_count += 1
+
+    for alignment in all_binary_results["alignments"]:
+
+        current_sequence_id = alignment["sequence_id"]
+        binary_results_for_read:list = [BinaryResultModel]
+        binary_results_for_read.append(BinaryResultModel(
+            sequence_id=alignment["sequence_id"],
+            file_id=file_id_sam,
+            type=str(type(alignment["position_in_ref"])),
+            name="position_in_ref",
+            value=alignment["position_in_ref"],
+        ))
+
+        binary_results_for_read.append(BinaryResultModel(
+            sequence_id=alignment["sequence_id"],
+            file_id=file_id_sam,
+            type=str(type(alignment["mapping_qual"])),
+            name="mapping_qual",
+            value=alignment["mapping_qual"],
+        ))
+
         for tag in alignment["mapping_tags"].items():
-            await add_binary_result(alignment["sequence_id"], BinaryResultModel(
+            binary_results_for_read.append(BinaryResultModel(
                               sequence_id=alignment["sequence_id"],
                               file_id=file_id_sam,
                               type=str(type(tag[1])),#the sam.tags function ommits the type of tags :(
                               name=str(tag[0]),
                               value=str(tag[1]),
                               ))
-            entry_count += 1
+        await add_binary_result(current_sequence_id,binary_results_for_read)
 
-    return {"added/updated "+ str(entry_count)+ " reads to mangodb"}
+    return {"added/updated "+ str(len(binary_results_for_read))+ " reads to mangodb"}
 
 @app.post('/kraken2/')
 async def kraken(filepath: Union[str]):
