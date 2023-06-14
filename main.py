@@ -26,7 +26,6 @@ from dotenv import load_dotenv
 load_dotenv('.env')
 
 app = FastAPI()
-#client = motor.motor_asyncio.AsyncIOMotorClient(os.environ["MONGODB_URL"]) #async motor driver to create mongo client
 client = MongoClient(os.environ["MONGODB_URI"])
 db = client.reads #specify database name 'reads'
 
@@ -46,58 +45,77 @@ async def create_read(read: ReadModel = Body(...)):
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_read)
 
 @app.get("/reads/", response_description="list all reads", response_model=List[ReadModel])
-async def list_reads():
+async def list_reads():#TODO includng binary result_ids in reads resulsts in loooong lists, and that is in already tiny input files
     reads =[]
     for read in db["reads"].find():
         reads.append(read)
-    #reads = await db["reads"].find().to_list(100)#hardcoded limit otherwise use skip and limit
-    return reads
+    if reads:
+        return JSONResponse(status_code=status.HTTP_200_OK, content=reads)
+    raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, detail=f"looks like there are no reads in the database yet")
 
-@app.get("/binary_results_to_read/", response_description="list all binary results to one read", response_model=BinaryResultModel)
-async def get_binary_results(sequence_id: Union[str]):
+@app.get("/binary_results/", response_description="list all binary results in db", response_model=List[BinaryResultModel])
+async def list_binary_results():
+    results =[]
+    for result in db["binary_results"].find():
+        results.append(result)
+    if results:
+        return JSONResponse(status_code=status.HTTP_200_OK, content=results)
+    raise HTTPException(status_code=status.HTTP_204_NO_CONTENT, detail=f"looks like there are no binary_results in the database yet")
+
+@app.get("/binary_results_to_read/", response_description="list all binary results to one read", response_model=List[BinaryResultModel])
+async def get_binary_results_to_read(sequence_id: Union[str]):
     binary_results_list =[]
-    if (binary_results := db["binary_results"].find({"sequence_id":sequence_id})) is not None:
-        binary_results_list.append(binary_results)
-        return binary_results
+    for binary_result in db["binary_results"].find({"sequence_id":sequence_id}):
+        binary_results_list.append(binary_result)
+    if binary_results_list:
+        return JSONResponse(status_code=status.HTTP_200_OK, content=binary_results_list)
     raise HTTPException(status_code=404, detail=f"read {sequence_id} not found in binary_database")
 
 
-@app.get("/{sequence_id}", response_description="get a specific read", response_model=ReadModel)#read model not ideal here since additional data might be present in DB
-async def get_read(sequence_id: Union[str]):#not sure if union is necessary here
+@app.get("/read/{sequence_id}", response_description="get a specific read", response_model=ReadModel)#TODO best practice endpoint design is what?
+async def get_read(sequence_id: str):
     if (read := db["reads"].find_one({"sequence_id":sequence_id})) is not None:
-        return read
-
+        return JSONResponse(status_code=status.HTTP_200_OK, content=read)
     raise HTTPException(status_code=404, detail=f"read {sequence_id} not found in database")
 
 @app.put("/{sequence_id}", response_description="add entries to binary collection and to a specific read", response_model=ReadModel)
-async def add_binary_result(sequence_id: str, new_data: list[BinaryResultModel]):
+async def add_binary_results_for_specific_read(sequence_id: str, new_data: list[BinaryResultModel]):
 
-    #new_data = jsonable_encoder(new_data)
+    new_data_jsonabled = []
+    for result in new_data:
+        result = jsonable_encoder(result)
+        new_data_jsonabled.append(result)
 
-    if (existing_read := db["reads"].find_one({"sequence_id":sequence_id})) is not None:
+    if (db["reads"].find_one({"sequence_id":sequence_id})) is not None:
 
-        new_binary_result_id = db["binary_results"].insert_many(new_data, ordered=True, bypass_document_validation=True).inserted_ids
-        #new_binary_result_id = new_binary_result.inserted_id
-        updated_read = db["reads"].update_one({"sequence_id": sequence_id},
-                                               {"$push": {"binary_results": new_binary_result_id}})# might be smarter to add all binary results for one read first and den push many
-        new_result = db["reads"].find_one({"sequence_id":sequence_id})
-        return JSONResponse(status_code=status.HTTP_201_CREATED, content=new_result)
+        new_binary_result_ids = db["binary_results"].insert_many(new_data_jsonabled).inserted_ids
+        db["reads"].update_one({"sequence_id": sequence_id},
+                                               {"$push": {"binary_results": {"$each": new_binary_result_ids}}})
+        updated_read = db["reads"].find_one({"sequence_id":sequence_id})
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content=updated_read)
 
     raise HTTPException(status_code=404, detail=f"read {sequence_id} not found in read-collection for update, therefore not added to binary_result collection either")
 
-@app.delete("/{sequence_id}", response_description="Delete a read") #bson.errors.InvalidDocument: cannot encode object: <built-in function id>, of type: <class 'builtin_function_or_method'>
+@app.delete("/read/{sequence_id}", response_description="Delete a read") #bson.errors.InvalidDocument: cannot encode object: <built-in function id>, of type: <class 'builtin_function_or_method'>
 async def delete_read(sequence_id: str):
-    delete_result = db["reads"].delete_one({"sequence_id":sequence_id})
-
-    if delete_result.deleted_count ==1:
-        return JSONResponse(status_code=status.HTTP_204_NO_CONTENT, content=f"deleted {sequence_id}")#RuntimeError: Response content longer than Content-Length
-
-
+    delete_binary_results_count = db["binary_results"].delete_many({"sequence_id":sequence_id}).deleted_count#TODO mimics on delete cascade ob das so smart ist...
+    deleted_read = db["reads"].delete_one({"sequence_id":sequence_id})
+    if deleted_read.deleted_count ==1:
+        return JSONResponse(status_code=status.HTTP_200_OK, content=f"deleted read {sequence_id} and {str(delete_binary_results_count)} adjacent binary_results")
     raise HTTPException(status_code=404, detail=f"Read {sequence_id} not found for deletion")
+
+@app.delete("/binary_results/{sequence_id}", response_description="delete binary results for a read")
+async def delete_binary_results_for_read(sequence_id: str):
+    if (binary_results := db["binary_results"].find({"sequence_id": sequence_id})) is not None:
+        db["reads"].update_one({"sequence_id": sequence_id}, {"$pull":{"binary_results":{}}})#TODO how to delete all elements in array?
+        delete_binary_results_count = db["binary_results"].delete_many({"sequence_id": sequence_id}).deleted_count
+        return JSONResponse(status_code=status.HTTP_200_OK,
+                            content=f"deleted {str(delete_binary_results_count)} binary_results adjacent to read {sequence_id}")
+    raise HTTPException(status_code=404, detail=f"Read {sequence_id} not found for binary_result deletion")
 
 @app.post('/fastq/')
 async def postfastq(filepath: Union[str]):
-    file_id_fastq = uuid4()
+    file_id_fastq = uuid4()#TODO rausfinden ob das hier überhaupt sinnvoll ist, und nicht eine sessionid oder besser
 
     reads = get_fastq_metrics(filepath)
 
@@ -121,11 +139,14 @@ async def sam(filepath: Union[str]):
 
     all_binary_results = get_sam_metrics(filepath)
     file_id_sam = str(uuid4())#na ob das so smart ist hier...
+    updated_reads=0
+    all_inserted_binary_results=0
 
     for alignment in all_binary_results["alignments"]:
 
-        current_sequence_id = alignment["sequence_id"]
-        binary_results_for_read:list = [BinaryResultModel]
+        current_read = alignment["sequence_id"]
+        binary_results_for_read:list = []
+
         binary_results_for_read.append(BinaryResultModel(
             sequence_id=alignment["sequence_id"],
             file_id=file_id_sam,
@@ -150,33 +171,43 @@ async def sam(filepath: Union[str]):
                               name=str(tag[0]),
                               value=str(tag[1]),
                               ))
-        await add_binary_result(current_sequence_id,binary_results_for_read)
 
-    return {"added/updated "+ str(len(binary_results_for_read))+ " reads to mangodb"}
+        mango_response = await add_binary_results_for_specific_read(current_read, binary_results_for_read)
+        if mango_response.status_code==201:
+            updated_reads += 1
+            all_inserted_binary_results+= len(binary_results_for_read)
+
+    return {"added "+ str(all_inserted_binary_results)+ " binary results to "+ str(updated_reads) +" reads in mangodb"}
+    #TODO it's a bit sketchy the numbers. can't i get that from mongodb insert response?
 
 @app.post('/kraken2/')
 async def kraken(filepath: Union[str]):
 
     kraken_results = get_kraken_metrics(filepath)
+    file_id_kraken2 = str(uuid4())#idk
 
-    file_name = filepath
-    file_id_kraken2 = uuid4()#idk
-
-    entry_count = 0
+    updated_reads = 0
+    all_inserted_binary_results = 0
 
     for classification in kraken_results:
-        add_binary_result(classification["sequence_id"], classification)
-        """for key in classification.keys():
+        current_read = classification["sequence_id"]
+        binary_results_for_read= []
+        for key in classification.keys():
             if key != "sequence_id":
-                db_binary_results = ModelBinary_results(sequence_id=classification["sequence_id"],
-                                                        type=str(type(classification[key])),
-                                                        name= str(key),
-                                                        value= str(classification[key]),
-                                                        file_id=file_id)
-                db.session.add(db_binary_results)
-                db.session.commit()"""
-        entry_count += 1
-    return {"added " + str(entry_count) + "entries from binary of choice to postgresdb"}
+                binary_results_for_read.append(BinaryResultModel(sequence_id=classification["sequence_id"],
+                                                      file_id=file_id_kraken2,
+                                                      type=str(type(classification[key])),
+                                                      name= str(key),
+                                                      value= str(classification[key])
+                                                      ))
+        mango_response = await add_binary_results_for_specific_read(current_read, binary_results_for_read)
+        if mango_response.status_code == 201:
+            updated_reads += 1
+            all_inserted_binary_results += len(binary_results_for_read)
+
+    return {
+        "added " + str(all_inserted_binary_results) + " binary results to " + str(updated_reads) + " reads in mangodb"}
+    # TODO it's a bit sketchy the numbers. can't i get that from mongodb insert response?
 
 
 
