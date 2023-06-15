@@ -107,13 +107,13 @@ async def delete_read(sequence_id: str):
 @app.delete("/binary_results/{sequence_id}", response_description="delete binary results for a read")
 async def delete_binary_results_for_read(sequence_id: str):
     if (binary_results := db["binary_results"].find({"sequence_id": sequence_id})) is not None:
-        db["reads"].update_one({"sequence_id": sequence_id}, {"$pull":{"binary_results":{}}})#TODO how to delete all elements in array?
+        db["reads"].update_one({"sequence_id": sequence_id}, {"$set": {"binary_results": []}})
         delete_binary_results_count = db["binary_results"].delete_many({"sequence_id": sequence_id}).deleted_count
         return JSONResponse(status_code=status.HTTP_200_OK,
                             content=f"deleted {str(delete_binary_results_count)} binary_results adjacent to read {sequence_id}")
     raise HTTPException(status_code=404, detail=f"Read {sequence_id} not found for binary_result deletion")
 
-@app.post('/fastq/')
+@app.post('/fastq/', response_description="Add all reads from a fastq file to database")
 async def postfastq(filepath: Union[str]):
     file_id_fastq = uuid4()#TODO rausfinden ob das hier überhaupt sinnvoll ist, und nicht eine sessionid oder besser
 
@@ -134,7 +134,7 @@ async def postfastq(filepath: Union[str]):
     return {"added "+ str(len(reads))+ " reads to mangodb"}
 
 
-@app.post('/sam/')
+@app.post('/sam/', response_description="Add all alignments from sam file to database")
 async def sam(filepath: Union[str]):
 
     all_binary_results = get_sam_metrics(filepath)
@@ -180,7 +180,7 @@ async def sam(filepath: Union[str]):
     return {"added "+ str(all_inserted_binary_results)+ " binary results to "+ str(updated_reads) +" reads in mangodb"}
     #TODO it's a bit sketchy the numbers. can't i get that from mongodb insert response?
 
-@app.post('/kraken2/')
+@app.post('/kraken2/', response_description="Add all classifications from kraken2 output to database")
 async def kraken(filepath: Union[str]):
 
     kraken_results = get_kraken_metrics(filepath)
@@ -208,6 +208,22 @@ async def kraken(filepath: Union[str]):
     return {
         "added " + str(all_inserted_binary_results) + " binary results to " + str(updated_reads) + " reads in mangodb"}
     # TODO it's a bit sketchy the numbers. can't i get that from mongodb insert response?
+    #TODO also Kraken files have an lca mapping list, which is saved whole as a string, is that what we want?
+
+@app.delete('/clear_all_binary_results/')#TODO implement better response and exception handling
+async def delete_all_binary_results():
+    delete_binaries_from_reads = db["reads"].update_many({}, {"$set":{"binary_results":[]}})
+    deleted_binary = db["binary_results"].drop()
+    return JSONResponse(status_code=status.HTTP_200_OK, content="database cleared of binary_results")
+
+@app.delete('/clear_all/')#TODO deletes the collections, but still raises HTTPException
+async def delete_all_collections():
+    deleted_binary = db["binary_results"].drop()
+    deleted_reads = db["reads"].drop()
+    if deleted_reads:
+        return JSONResponse(status_code=status.HTTP_200_OK, content="database cleared of all collections")
+    raise HTTPException(status_code=status.HTTP_204_NO_CONTENT)
+
 
 
 
