@@ -1,23 +1,19 @@
-from pydantic import BaseModel, Field, EmailStr
-
 import uvicorn
+import requests
 from uuid import uuid4
 
-from fastapi import FastAPI, File, UploadFile, Body, HTTPException, status
-from fastapi.responses import Response, JSONResponse
+from fastapi import FastAPI, Body, HTTPException, status
+from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-from bson import ObjectId
-from typing import Optional, List, Union
-import motor.motor_asyncio
+
+from typing import List, Union
+
 from pymongo.mongo_client import MongoClient
 
 from Datafile_API.fastq_parser import get_fastq_metrics
 from Datafile_API.sam_parser import get_sam_metrics
 from Datafile_API.kraken2_script import get_kraken_metrics
 
-from schema import Raw_data as SchemaRaw_data
-from schema import Binary_results as SchemaBinary_result
-from schema import File_name_and_uuid as SchemaFile_name_and_uuid
 from models import ReadModel as ReadModel, PyObjectId, BinaryResultModel
 
 import os
@@ -29,13 +25,84 @@ app = FastAPI()
 client = MongoClient(os.environ["MONGODB_URI"])
 db = client.reads #specify database name 'reads'
 
-# to avoid csrftokenError
+# uncomment to avoid csrftokenError
 #app.add_middleware(DBSessionMiddleware, db_url=os.environ['MONGODB_URL'])
 
 
 @app.get("/")
 async def root():
     return {"message": "Hello World"}
+
+@app.get("/binary_API_sam_json_from_fastq/")
+async def call_binary_api_sam_json_from_fastq(fastqpath: Union[str],
+                                              fastaurl: Union[str],
+                                              rootpath: Union[str]):
+    response = await call_binary_api(endpoint="/sam_json_from_fastq/", params={"fastqpath":fastqpath,
+                                                                                "fastaurl":fastaurl,
+                                                                                "rootpath":rootpath})
+    return response.json()
+
+@app.get("/binary_API_sam_json/")  # TODO write json to db
+async def call_binary_api_sam_sjon_endpoint(sampath: Union[str]):
+    response = await call_binary_api(endpoint="/sam_json/", params={"sampath": sampath})
+    return response.json()
+
+@app.get("/binary_API_sam_csv/")
+async def call_binary_api_sam_csv_endpoint(sampath: Union[str]):
+    response = await call_binary_api(endpoint="/sam_csv/", params={"sampath": sampath})
+    return response.json()
+
+@app.get("/binary_API_fastq_json/")
+async def call_binary_api_fastq_json_endpoint(fastqpath: Union[str]):
+    response = await call_binary_api(endpoint="/fastq_json/", params={"fastqpath": fastqpath})
+    return response.json()
+
+@app.get("/binary_API_fastq_csv/")
+async def call_binary_api_fastq_csv_endpoint(fastqpath: Union[str]):
+    response = await call_binary_api(endpoint="/fastq_csv/", params={"fastqpath": fastqpath})
+    return response.json()
+
+@app.get("/binary_API_kraken_json/")
+async def call_binary_api_kraken_json_endpoint(krakendb: Union[str],
+                                               fastafile:Union[str],
+                                               output: Union[str]):
+    response = await call_binary_api(endpoint="/kraken_json/", params={"krakendb": krakendb,
+                                                                       "fastafile": fastafile,
+                                                                       "output": output})
+    return response.json()
+
+@app.get("/binary_API_init/")
+async def call_binary_api_init_by_config_obj(config: Union[str]):
+    response = await call_binary_api(endpoint="/init/", params={"config": config})
+    return response.json()
+
+@app.get("/binary_API_init_by_path/")
+async def call_binary_api_init_by_path(configpath: Union[str]):
+    response = await call_binary_api(endpoint="/init_by_path/", params={"config":configpath})
+    return response.json()
+
+@app.get("/binary_API_init_async/")
+async def call_binary_api_init_async(configpath: Union[str], threadname: Union[str]):
+    response = await call_binary_api(endpoint="/init_async/", params={"config":configpath, "threadname": threadname})
+    return response.json()
+
+@app.get("/binary_API_check_thread/")
+async def call_binary_api_check_thread(threadname: Union[str]):
+    response = await call_binary_api(endpoint="/check_thread/", params={"threadname": threadname})
+    return response.json()
+
+@app.get("/binary_API_json_from_bowtie_exec/")
+async def call_binary_api_json_from_bowtie_execution(fastapath: Union[str], fastqpath: Union[str], rootpath: Union[str]):
+    response = await call_binary_api(endpoint="/sam_json_from_bowtie_execution/", params={"fastapath":fastapath,
+                                                                                          "fastqpath": fastqpath,
+                                                                                          "rootpath": rootpath})
+    return response.json()
+
+@app.get("/binary_api/")
+async def call_binary_api(endpoint: Union[str], params: dict[str, str]):
+    binary_api_url = os.environ['BINARY_API_URL']
+    response = requests.get(url=binary_api_url + endpoint, params=params)
+    return response
 
 @app.post('/read/', response_description="Add new Read", response_model=ReadModel)
 async def create_read(read: ReadModel = Body(...)):
@@ -210,19 +277,23 @@ async def kraken(filepath: Union[str]):
     # TODO it's a bit sketchy the numbers. can't i get that from mongodb insert response?
     #TODO also Kraken files have an lca mapping list, which is saved whole as a string, is that what we want?
 
-@app.delete('/clear_all_binary_results/')#TODO implement better response and exception handling
+@app.delete('/clear_all_binary_results/')
 async def delete_all_binary_results():
-    delete_binaries_from_reads = db["reads"].update_many({}, {"$set":{"binary_results":[]}})
-    deleted_binary = db["binary_results"].drop()
-    return JSONResponse(status_code=status.HTTP_200_OK, content="database cleared of binary_results")
+    modified_reads_count = db["reads"].update_many({}, {"$set":{"binary_results":[]}}).modified_count
+    db["binary_results"].drop()
+    if "binary_results" not in db.list_collection_names():
+        if modified_reads_count > 0:
+            return JSONResponse(status_code=status.HTTP_200_OK, content="database cleared of binary_results")
+    raise HTTPException(status_code=status.HTTP_304_NOT_MODIFIED, detail="either couldn't delete binary_result_collection or couldn't delete them from reads")
 
-@app.delete('/clear_all/')#TODO deletes the collections, but still raises HTTPException
+@app.delete('/clear_all/')
 async def delete_all_collections():
-    deleted_binary = db["binary_results"].drop()
-    deleted_reads = db["reads"].drop()
-    if deleted_reads:
-        return JSONResponse(status_code=status.HTTP_200_OK, content="database cleared of all collections")
-    raise HTTPException(status_code=status.HTTP_204_NO_CONTENT)
+    db["binary_results"].drop()
+    if "binary_results" not in db.list_collection_names():
+        db["reads"].drop()
+        if "reads" not in db.list_collection_names():
+            return JSONResponse(status_code=status.HTTP_200_OK, content="database cleared of all collections")
+    raise HTTPException(status_code=status.HTTP_304_NOT_MODIFIED, detail="either couldn't drop one of the collections or both")
 
 
 
