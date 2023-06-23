@@ -93,9 +93,9 @@ async def call_binary_api_check_thread(threadname: Union[str]):
 
 @app.get("/binary_API_json_from_bowtie_exec/")
 async def call_binary_api_json_from_bowtie_execution(fastapath: Union[str], fastqpath: Union[str], rootpath: Union[str]):
-    response = await call_binary_api(endpoint="/sam_json_from_bowtie_execution/", params={"fastapath":fastapath,
+    response = await call_binary_api(endpoint="/sam_json_from_bowtie_execution/", params={"fastapath": fastapath,
                                                                                           "fastqpath": fastqpath,
-                                                                                          "rootpath": rootpath})
+                                                                                           "rootpath": rootpath})
     return response.json()
 
 @app.get("/binary_api/")

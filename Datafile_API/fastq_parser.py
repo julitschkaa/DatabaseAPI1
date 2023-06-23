@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.patches as patches
 
-def get_fastq_metrics(filename):
+def get_fastq_metrics(filename):#TODO fastq in binary_results einpflegen??
     fastq_parser = SeqIO.parse(open(filename, "rt"), "fastq")
     reads = list()
     for record in fastq_parser:
