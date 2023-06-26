@@ -6,9 +6,10 @@ import http3
 import requests
 from uuid import uuid4
 
-from fastapi import FastAPI, status
+from fastapi import FastAPI, status, HTTPException
 from fastapi_sqlalchemy import DBSessionMiddleware, db
 from requests import Response
+from sqlalchemy import Table
 
 from Datafile_API.fastq_parser import get_fastq_metrics
 from Datafile_API.sam_parser import get_sam_metrics
@@ -137,7 +138,7 @@ async def post_binary_result(binary_result: SchemaBinary_result):
     return db_binary_result
 
 
-@app.get('/sequence_id/', response_description="get read including all binary entries by sequence_id")
+@app.get('/read_inlc_binary_results/{sequence_id}', response_description="get read including all binary entries by sequence_id")
 async def get_entries_by_sequence_id(sequence_id: Union[str]):
     raw_data = db.session.query(ModelRaw_data).all()  # TODO join tables on sequence id
     raw_data_results = [read for read in raw_data if read.sequence_id == sequence_id]
@@ -163,6 +164,52 @@ async def list_raw_data_entries():
     # raw_data = db.session.query(ModelRaw_data).count()
     return raw_data
 
+@app.delete('/raw_data_by_id/{sequence_id}', response_description="delete all entries in raw_data table")
+async def delete_raw_data(sequence_id: Union[str]):
+    to_be_deleted = db.session.query(ModelRaw_data).filter(ModelRaw_data.sequence_id == sequence_id).first()
+    await delete_binary_results_by_id(sequence_id)
+    if not to_be_deleted:
+        raise HTTPException(status_code=404, detail="read not found")
+    db.session.delete(to_be_deleted)
+    db.session.commit()
+    return status.HTTP_200_OK
+
+@app.delete('/binary_results_by_id/{sequence_id}', response_description="delete all entries with matching id in binary_results table")
+async def delete_binary_results_by_id(sequence_id: Union[str]):
+    to_be_deleted_list = await list_binary_results(sequence_id)
+    if not to_be_deleted_list:
+        raise HTTPException(status_code=404, detail="no binary results with matching sequence_id found")
+    for result in to_be_deleted_list:
+        db.session.delete(result)
+    db.session.commit()
+    return status.HTTP_200_OK
+
+@app.delete('/delete_binary_results/', response_description="delete all entries in binary_results table")
+async def delete_all_binary_results():#TODO add exceptionhandling and better return status
+    modifiedcount = db.session.query(ModelBinary_results).delete()
+    if modifiedcount < 1:
+        raise HTTPException(status_code=404, detail="no entries ind binary_results found")
+    db.session.commit()
+    return status.HTTP_200_OK
+
+
+@app.delete('/delete_raw_data/', response_description="delete all entries in raw_data table")
+async def delete_all_raw_data():#TODO add exceptionhandling and better return status
+    modifiedcount = db.session.query(ModelRaw_data).delete()
+    if modifiedcount < 1:
+        raise HTTPException(status_code=404, detail="no entries ind raw_data found")
+    db.session.commit()
+    return status.HTTP_200_OK
+
+@app.delete('/filename_and_uuid/', response_description="delete all entries in file_name_and_uuid table")
+async def delete_all_filename_and_uuid():
+    modifiedcount  = db.session.query(ModelFile_name_and_uuid).delete()
+    if modifiedcount < 1:
+        raise HTTPException(status_code=404, detail="no entries ind file_name_and_uuid found")
+    db.session.commit()
+    return status.HTTP_200_OK
+
+
 
 @app.get('/binary_results_by_seq_id/',
          response_description="list all reads with matching seq_id in binary_results table",
@@ -170,13 +217,17 @@ async def list_raw_data_entries():
 async def list_binary_results(sequence_id: Union[str]):
     binary_results = db.session.query(ModelBinary_results).all()
     results = [x for x in binary_results if x.sequence_id == sequence_id]
+    if not results:
+        raise HTTPException(status_code=404, detail="no binary results with matching sequence_id found")
     return results
 
 
 @app.get('/file_name_and_uuid/', response_description="list all entries in file_name_and_id",
-         response_model=List[SchemaFile_name_and_uuid])
+         response_model=List[SchemaFile_name_and_uuid])#TODO throws pydantic validation error in serialize response uuid ist null??
 async def list_file_name_and_uuid():
     file_name_and_uuids = db.session.query(ModelFile_name_and_uuid).all()
+    if not file_name_and_uuids:
+        raise HTTPException(status_code=204, detail="no entries in file_name_uuid found")
     return file_name_and_uuids
 
 
