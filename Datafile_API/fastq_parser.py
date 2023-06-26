@@ -12,7 +12,7 @@ def get_fastq_metrics(filename):
     reads = list()
     for record in fastq_parser:
         read = {}
-        read["id"] = record.id
+        read["sequence_id"] = record.id
         read["sequence"] = str(record.seq)
         read["sequence_length"] = len(str(record.seq))
         read["min_quality"] = min(record.letter_annotations["phred_quality"])
