@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Float
+from sqlalchemy import Column, ForeignKey, Integer, String, Float, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, Mapped
 
@@ -9,13 +9,14 @@ class Binary_results(Base) :
     __tablename__ = 'binary_results'
     id = Column(Integer, primary_key=True, index=True)#same here ist das ding noetig??
     sequence_id = Column(String)
-    file_id = Column(Integer, ForeignKey('file_name_and_uuid.id'))
+    file_id = Column(Integer, ForeignKey('file_name_and_uuid.id', onupdate='CASCADE', ondelete='CASCADE'))
     name = Column(String)
     type = Column(String)
     value = Column(String)
 
     file_name_and_uuid = relationship('File_name_and_uuid')
 
+sequence_id_index = Index('sequence_id_index', Binary_results.sequence_id, postgresql_using='hash')
 
 
 class File_name_and_uuid(Base) :

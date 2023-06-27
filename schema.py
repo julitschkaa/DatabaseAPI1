@@ -15,7 +15,7 @@ class Binary_results(BaseModel):
 class File_name_and_uuid(BaseModel):
     file_name: str
     binary_of_origin: str
-    uuid: str
+    file_uuid: str
 
     class Config:
         orm_mode = True

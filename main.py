@@ -152,8 +152,10 @@ async def delete_all_filename_and_uuid():
          response_description="list all reads with matching seq_id in binary_results table",
          response_model=List[SchemaBinary_result])
 async def list_binary_results(sequence_id: Union[str]):
-    binary_results = db.session.query(ModelBinary_results).all()
-    results = [x for x in binary_results if x.sequence_id == sequence_id]
+    #binary_results = db.session.query(ModelBinary_results).all()
+    binary_results = db.session.query(ModelBinary_results).filter_by(sequence_id=sequence_id).all()
+    #results = [x for x in binary_results if x.sequence_id == sequence_id]
+    results = binary_results
     if not results:
         raise HTTPException(status_code=404, detail="no binary results with matching sequence_id found")
     return results
@@ -190,6 +192,7 @@ async def create_file_name_and_uuid_entries(file_name_and_uuid: SchemaFile_name_
 @app.post('/fastq/', status_code=status.HTTP_201_CREATED)  # TODO: check if file is already in filename_and_uuid_table
 async def create_fastq_entries(filepath: Union[str]):
     db_file_name_and_uuid = ModelFile_name_and_uuid(file_name=filepath,
+                                                    binary_of_origin="fastq",
                                                     file_uuid=uuid4())
     db.session.add(db_file_name_and_uuid)
     db.session.commit()
@@ -198,14 +201,15 @@ async def create_fastq_entries(filepath: Union[str]):
     reads = get_fastq_metrics(filepath)
 
     for read in reads:
-        for item in read.items():
-            db_binary_results = ModelBinary_results(sequence_id = read["sequence_id"],
-                                                    file_id=fastq_id,
-                                                    name=item[0],
-                                                    type=str(type(item[1])),
-                                                    value=str(item[1])
-                                                    )
-        db.session.add(db_binary_results)
+        for key, value in read.items():
+            if key != "sequence_id":
+                db_binary_results = ModelBinary_results(sequence_id = read["sequence_id"],
+                                                        file_id=fastq_id,
+                                                        name=str(key),
+                                                        type=str(type(value)),
+                                                        value=str(value)
+                                                        )
+                db.session.add(db_binary_results)
         db.session.commit()
     return {'added ' + str(len(reads)) + ' reads to postgresDB'}
 
@@ -216,6 +220,7 @@ async def create_sam_enries(filepath: Union[str]):
 
     file_name = binary_results["mapping_reference_file"]
     db_file_name_and_uuid = ModelFile_name_and_uuid(file_name=file_name,
+                                                    binary_of_origin=binary_results["binary_of_origin"],
                                                     file_uuid=uuid4())
     db.session.add(db_file_name_and_uuid)
     db.session.commit()
@@ -263,6 +268,7 @@ async def create_kraken_entries(filepath: Union[str]):
 
     file_name = filepath
     db_file_name_and_uuid = ModelFile_name_and_uuid(file_name=file_name,
+                                                    binary_of_origin="Kraken2",
                                                     file_uuid=uuid4())
     db.session.add(db_file_name_and_uuid)
     db.session.commit()
