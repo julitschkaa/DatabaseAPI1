@@ -1,6 +1,6 @@
 import uuid
 
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
 from bson import ObjectId
 from typing import Optional, List
 
@@ -25,7 +25,7 @@ class PyObjectId(ObjectId):
         field_schema.update(type="string")
 
 
-class ReadModel(BaseModel):
+class FastqReadModel(BaseModel):
     id: PyObjectId = Field(default_factory=PyObjectId,
                            alias="_id")  # aliased because pydantic otherwise assumes private variable
     sequence_id: str = Field(...)
@@ -35,8 +35,7 @@ class ReadModel(BaseModel):
     max_quality: int = Field(...)
     average_quality: float = Field(...)
     phred_quality: str = Field(...)
-    binary_results: list = []
-    file_id_fastq: str = Field(...)  # could be session id instead?
+    file_name: str = Field(...)  # could be session id instead?
 
     class Config:
         allow_population_by_field_name = True
@@ -44,14 +43,32 @@ class ReadModel(BaseModel):
         json_encoders = {ObjectId: str}
 
 
-class BinaryResultModel(BaseModel):
+class Bowtie2ResultModel(BaseModel):
     id: PyObjectId = Field(default_factory=PyObjectId,
                            alias="_id")  # aliased because pydantic otherwise assumes private variable
     sequence_id: str = Field(...)
-    file_id: str = Field(...)
-    type: str = Field(...)
-    name: str = Field(...)
-    value: str = Field(...)
+    mapping_tags: dict = Field(...)
+    position_in_ref: int = Field(...)
+    mapping_qual: int = Field(...)
+    file_name: str = Field(...)
+    #I'm not including binary of origin, as its already in model name
+    mapping_reference_file: str = Field(...)#this is not included in other db-s but might be necessary?
+    #TODO find out if mapping reference file is something often requeted for visualizaion
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+
+class Kraken2ResultModel(BaseModel):
+    id: PyObjectId = Field(default_factory=PyObjectId,
+                           alias="_id")  # aliased because pydantic otherwise assumes private variable
+    sequence_id: str = Field(...)
+    classified: str = Field(...)
+    taxonomy_id: str = Field(...)
+    sequence_length: int = Field(...)
+    lca_mapping_list: list = Field(...)
+    file_name: str = Field(...)
 
     class Config:
         allow_population_by_field_name = True
