@@ -1,12 +1,12 @@
+import pymongo
 import uvicorn
 import requests
-from uuid import uuid4
 
 from fastapi import FastAPI, Body, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
-from typing import List, Union, Any
+from typing import List, Union
 
 from pydantic import BaseModel
 from pymongo.mongo_client import MongoClient
@@ -15,7 +15,7 @@ from Datafile_API.fastq_parser import get_fastq_metrics
 from Datafile_API.sam_parser import get_sam_metrics
 from Datafile_API.kraken2_script import get_kraken_metrics
 
-from models import PyObjectId, FastqReadModel, Bowtie2ResultModel
+from models import PyObjectId, FastqReadModel, Bowtie2ResultModel, Kraken2ResultModel
 
 import os
 from dotenv import load_dotenv
@@ -24,7 +24,8 @@ load_dotenv('.env')
 
 app = FastAPI()
 client = MongoClient(os.environ["MONGODB_URI"])
-db = client.reads  # specify database name 'reads'
+db = client.eva_ngs  # specify database name 'eva_ngs'
+db["all_docs"].create_index([("sequence_id", pymongo.HASHED)])
 
 
 # uncomment to avoid csrftokenError
@@ -119,27 +120,37 @@ async def call_binary_api(endpoint: Union[str], params: dict[str, str]):
     response = requests.get(url=binary_api_url + endpoint, params=params)
     return response
 
+@app.get("/dimensions/")
+async def get_all_field_names():#TODO doesnt work yet
+    field_names =[]
+    cursor=db['all_docs'].find()
+    for document in cursor:
+        field_names.append(type(document))
+    return field_names
+
 
 @app.post('/document/', response_description="Add new Document", response_model=BaseModel)
 async def create_document(document: BaseModel = Body(...)):
     document = jsonable_encoder(document)
-    new_document = db["eva_ngs"].insert_one(document)
-    created_document = db["eva_ngs"].find_one({"_id": new_document.inserted_id})
+    new_document = db["all_docs"].insert_one(document)
+    created_document = db["all_docs"].find_one({"_id": new_document.inserted_id})
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_document)
 
-@app.post('/documents/', response_description="Add new Documents", response_model=List[BaseModel])
+
+@app.post('/documents/', response_description="Add new Documents")
 async def create_documents(documents: List[BaseModel] = Body(...)):
-    jsonied_documents=[]#TODO exceptionhandling needed
+    jsonied_documents = []  # TODO exceptionhandling needed
     for document in documents:
         jsonied_documents.append(jsonable_encoder(document))
-    new_documents_ids_list = db["eva_ngs"].insert_many(documents).inserted_ids
-    return JSONResponse(status_code=status.HTTP_201_CREATED, detail=f"created {len(new_documents_ids_list)} new documents in evan_ngs collection")
+    new_documents_ids_list = db["all_docs"].insert_many(jsonied_documents).inserted_ids
+    return JSONResponse(status_code=status.HTTP_201_CREATED,
+                        content=f"created {len(new_documents_ids_list)} new documents in eva_ngs collection")
 
 
 @app.get("/documents/", response_description="list all documents", response_model=List[BaseModel])
 async def list_all_documents():
     documents = []
-    for document in db["eva_ngs"].find():
+    for document in db["all_docs"].find():
         documents.append(document)
     if documents:
         return JSONResponse(status_code=status.HTTP_200_OK, content=documents)
@@ -151,16 +162,17 @@ async def list_all_documents():
          response_model=list[BaseModel])  # TODO doesnt find any seuqence ids... whelp
 async def get_documents_by_id(sequence_id: str):
     documents: list[BaseModel] = []
-    for document in db["eva_ngs"].find({"sequence_id":sequence_id}):
+    for document in db["all_docs"].find({"sequence_id": sequence_id}):
         documents.append(document)
     if documents:
         return JSONResponse(status_code=status.HTTP_200_OK, content=documents)
     raise HTTPException(status_code=404, detail=f"read {sequence_id} not found in database")
 
+
 @app.delete("/documents/{sequence_id}",
             response_description="Delete all documents by sequence_id")  # bson.errors.InvalidDocument: cannot encode object: <built-in function id>, of type: <class 'builtin_function_or_method'>
 async def delete_document_by_id(sequence_id: str):
-    deleted_documents_count = db["eva_ngs"].delete_many({"sequence_id": sequence_id}).deleted_count
+    deleted_documents_count = db["all_docs"].delete_many({"sequence_id": sequence_id}).deleted_count
     if deleted_documents_count > 0:
         return JSONResponse(status_code=status.HTTP_200_OK,
                             content=f"deleted {str(deleted_documents_count)} documents for sequence {sequence_id}")
@@ -170,85 +182,68 @@ async def delete_document_by_id(sequence_id: str):
 @app.post('/fastq/', response_description="Add all reads from a fastq file to database")
 async def uploadfastq(filepath: Union[str]):
     reads = get_fastq_metrics(filepath)
+    collected_fastq_reads = []
 
     for read in reads:
         # TODO check if sequence ID exists already
-        await create_document(FastqReadModel(id=PyObjectId(),
-                                     sequence_id=str(read["sequence_id"]),
-                                     sequence=str(read["sequence"]),
-                                     sequence_length=int(read["sequence_length"]),
-                                     min_quality=int(read["min_quality"]),
-                                     max_quality=int(read["max_quality"]),
-                                     average_quality=float(read["average_quality"]),
-                                     phred_quality=str(read["phred_quality"]),
-                                     file_name=filepath
-                                     ))
+        collected_fastq_reads.append(FastqReadModel(id=PyObjectId(),
+                                             sequence_id=str(read["sequence_id"]),
+                                             sequence=str(read["sequence"]),
+                                             sequence_length=int(read["sequence_length"]),
+                                             min_quality=int(read["min_quality"]),
+                                             max_quality=int(read["max_quality"]),
+                                             average_quality=float(read["average_quality"]),
+                                             phred_quality=str(read["phred_quality"]),
+                                             file_name=filepath
+                                             ))
 
-
-    return {"added " + str(len(reads)) + " FastqReadDocuments to mangodb"}
+    return await create_documents(collected_fastq_reads)
 
 
 @app.post('/sam/', response_description="Add all alignments from sam file to database")
-async def upload_sam(filepath: Union[str]):#TODO noch nicht fertig :')
-    all_binary_results = get_sam_metrics(filepath)
+async def upload_sam(filepath: Union[str]):  # TODO noch nicht fertig :')
+    sam_entries = get_sam_metrics(filepath)
     file_name_sam = filepath
-    all_inserted_binary_results = 0
+    collected_alignments: list = []
 
-    for alignment in all_binary_results["alignments"]:
-        binary_results_for_read: list = []
-
-        binary_results_for_read.append(Bowtie2ResultModel(
+    for alignment in sam_entries["alignments"]:
+        collected_alignments.append(Bowtie2ResultModel(
             sequence_id=alignment["sequence_id"],
             mapping_tags=alignment["mapping_tags"],
             position_in_ref=alignment["position_in_ref"],
             mapping_qual=alignment["mapping_qual"],
             file_name=file_name_sam,
-            mapping_reference_file=all_binary_results["mapping_reference_file"]
+            mapping_reference_file=sam_entries["mapping_reference_file"]
         ))
-        mango_response = await create_documents(binary_results_for_read)
-        if mango_response.status_code == 201:
-            all_inserted_binary_results += len(binary_results_for_read)
 
-    return {
-        "added " + str(all_inserted_binary_results) + " binary results to " + str(updated_reads) + " reads in mangodb"}
-    # TODO it's a bit sketchy the numbers. can't i get that from mongodb insert response?
+    return await create_documents(collected_alignments)
 
 
 @app.post('/kraken2/', response_description="Add all classifications from kraken2 output to database")
 async def kraken(filepath: Union[str]):
     kraken_results = get_kraken_metrics(filepath)
-    file_id_kraken2 = str(uuid4())  # idk
-
-    updated_reads = 0
-    all_inserted_binary_results = 0
+    file_name_kraken2 = filepath
+    collected_classifications: list = []
 
     for classification in kraken_results:
-        current_read = classification["sequence_id"]
-        binary_results_for_read = []
-        for key in classification.keys():
-            if key != "sequence_id":
-                binary_results_for_read.append(BinaryResultModel(sequence_id=classification["sequence_id"],
-                                                                 file_id=file_id_kraken2,
-                                                                 type=str(type(classification[key])),
-                                                                 name=str(key),
-                                                                 value=str(classification[key])
-                                                                 ))
-        mango_response = await add_binary_results_for_specific_read(current_read, binary_results_for_read)
-        if mango_response.status_code == 201:
-            updated_reads += 1
-            all_inserted_binary_results += len(binary_results_for_read)
+        collected_classifications.append(Kraken2ResultModel(
+            sequence_id=classification["sequence_id"],
+            classified=classification["classified"],
+            taxonomy_id=classification["taxonomy_id"],
+            sequence_length=classification["sequence_length"],
+            lca_mapping_list=classification["lca_mapping_list"],
+            file_name=file_name_kraken2
+        ))
+    return await create_documents(collected_classifications)
 
-    return {
-        "added " + str(all_inserted_binary_results) + " binary results to " + str(updated_reads) + " reads in mangodb"}
-    # TODO it's a bit sketchy the numbers. can't i get that from mongodb insert response?
-    # TODO also Kraken files have an lca mapping list, which is saved whole as a string, is that what we want?
 
 @app.delete('/clear_all/')
 async def delete_all_documents():
-    if "eva_ngs" not in db.list_collection_names():
-        raise HTTPException(status_code=status.HTTP_304_NOT_MODIFIED, detail="no table eva_ngs found in mangodb")
-    db["eva_ngs"].drop()
-    return JSONResponse(status_code=status.HTTP_200_OK, content="database collection eva_ngs cleared of all documents")
+    if "all_docs" not in db.list_collection_names():
+        raise HTTPException(status_code=status.HTTP_304_NOT_MODIFIED, detail="no table all_docs found in mangodb")
+    db["all_docs"].drop()
+    return JSONResponse(status_code=status.HTTP_200_OK, content="database collection all_docs cleared of all documents")
+
 
 # To run locally
 if __name__ == '__main__':
