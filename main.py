@@ -180,7 +180,7 @@ async def delete_document_by_id(sequence_id: str):
 
 
 @app.post('/fastq/', response_description="Add all reads from a fastq file to database")
-async def uploadfastq(filepath: Union[str]):
+async def upload_fastq(filepath: Union[str]):
     reads = get_fastq_metrics(filepath)
     collected_fastq_reads = []
 
@@ -220,7 +220,7 @@ async def upload_sam(filepath: Union[str]):  # TODO noch nicht fertig :')
 
 
 @app.post('/kraken2/', response_description="Add all classifications from kraken2 output to database")
-async def kraken(filepath: Union[str]):
+async def upload_kraken(filepath: Union[str]):
     kraken_results = get_kraken_metrics(filepath)
     file_name_kraken2 = filepath
     collected_classifications: list = []
