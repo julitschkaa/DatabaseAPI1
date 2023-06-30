@@ -15,8 +15,9 @@ from Datafile_API.sam_parser import get_sam_metrics
 from Datafile_API.kraken2_script import get_kraken_metrics
 
 from schema import Binary_results as SchemaBinary_result
+from schema import Dimension as SchemaDimension
 from schema import File_name_and_uuid as SchemaFile_name_and_uuid
-from models import Binary_results as ModelBinary_results
+from models import Binary_result as ModelBinary_result
 from models import File_name_and_uuid as ModelFile_name_and_uuid
 
 import os
@@ -106,12 +107,21 @@ async def call_binary_api(endpoint: Union[str], params: dict[str, str]):
     response = requests.get(url=binary_api_url + endpoint, params=params)
     return response
 
+@app.get("/dimensions/", response_description="a list of dimensions currently saved in postgres db",
+         status_code=status.HTTP_200_OK,
+         response_model=List[SchemaDimension]
+         )
+async def list_all_possible_dimensions():#TODO dimensions as json objects not ideal. dict would be nice?
+    dimensions_names = db.session.query(ModelBinary_result.name,ModelBinary_result.type).distinct().all()
+    if not dimensions_names:
+        raise HTTPException(status_code=404, detail="no dimensions found")
+    return dimensions_names
 
 
 @app.post('/binary_result/', response_description="write entries to binary_result table"
     , response_model=SchemaBinary_result, status_code=status.HTTP_201_CREATED)
 async def post_binary_result(binary_result: SchemaBinary_result):
-    db_binary_result = ModelBinary_results(sequence_id=binary_result.sequence_id,
+    db_binary_result = ModelBinary_result(sequence_id=binary_result.sequence_id,
                                      type=binary_result.type,
                                      name=binary_result.name,
                                      value=binary_result.value,
@@ -119,6 +129,13 @@ async def post_binary_result(binary_result: SchemaBinary_result):
     db.session.add(db_binary_result)
     db.session.commit()
     return db_binary_result
+
+@app.post('/binary_results/', response_description="write entries to binary_result table"
+    , response_model=List[SchemaBinary_result], status_code=status.HTTP_201_CREATED)
+async def post_binary_result(binary_results: List[SchemaBinary_result]):
+    db.session.add_all(binary_results)
+    db.session.commit()
+    return status.HTTP_201_CREATED
 
 @app.delete('/binary_results_by_id/{sequence_id}', response_description="delete all entries with matching id in binary_results table")
 async def delete_binary_results_by_id(sequence_id: Union[str]):
@@ -132,7 +149,7 @@ async def delete_binary_results_by_id(sequence_id: Union[str]):
 
 @app.delete('/delete_binary_results/', response_description="delete all entries in binary_results table")
 async def delete_all_binary_results():#TODO add exceptionhandling and better return status
-    modifiedcount = db.session.query(ModelBinary_results).delete()
+    modifiedcount = db.session.query(ModelBinary_result).delete()
     if modifiedcount < 1:
         raise HTTPException(status_code=404, detail="no entries ind binary_results found")
     db.session.commit()
@@ -152,26 +169,23 @@ async def delete_all_filename_and_uuid():
          response_description="list all reads with matching seq_id in binary_results table",
          response_model=List[SchemaBinary_result])
 async def list_binary_results(sequence_id: Union[str]):
-    #binary_results = db.session.query(ModelBinary_results).all()
-    binary_results = db.session.query(ModelBinary_results).filter_by(sequence_id=sequence_id).all()
-    #results = [x for x in binary_results if x.sequence_id == sequence_id]
-    results = binary_results
-    if not results:
+    binary_results = db.session.query(ModelBinary_result).filter_by(sequence_id=sequence_id).all()
+    if not binary_results:
         raise HTTPException(status_code=404, detail="no binary results with matching sequence_id found")
-    return results
+    return binary_results
 
 @app.get('/binary_results/',
          response_description="list all binary_results",
          response_model=List[SchemaBinary_result])
 async def list_binary_results():
-    binary_results = db.session.query(ModelBinary_results).all()
+    binary_results = db.session.query(ModelBinary_result).all()
     if not binary_results:
         raise HTTPException(status_code=404, detail="no binary results found")
     return binary_results
 
 
 @app.get('/file_name_and_uuid/', response_description="list all entries in file_name_and_id",
-         response_model=List[SchemaFile_name_and_uuid])#TODO throws pydantic validation error in serialize response uuid ist null??
+         response_model=List[SchemaFile_name_and_uuid])
 async def list_file_name_and_uuid():
     file_name_and_uuids = db.session.query(ModelFile_name_and_uuid).all()
     if not file_name_and_uuids:
@@ -181,9 +195,7 @@ async def list_file_name_and_uuid():
 
 @app.post('/file_name_and_uuid/', response_description="write entries to file_name_and_id table",
           response_model=SchemaFile_name_and_uuid, status_code=status.HTTP_201_CREATED)
-async def create_file_name_and_uuid_entries(file_name_and_uuid: SchemaFile_name_and_uuid):
-    db_file_name_and_uuid = ModelFile_name_and_uuid(file_name=file_name_and_uuid.name,
-                                                    file_uuid=file_name_and_uuid.uuid)
+async def create_file_name_and_uuid_entries(db_file_name_and_uuid: SchemaFile_name_and_uuid):
     db.session.add(db_file_name_and_uuid)
     db.session.commit()
     return db_file_name_and_uuid
@@ -191,19 +203,17 @@ async def create_file_name_and_uuid_entries(file_name_and_uuid: SchemaFile_name_
 
 @app.post('/fastq/', status_code=status.HTTP_201_CREATED)  # TODO: check if file is already in filename_and_uuid_table
 async def create_fastq_entries(filepath: Union[str]):
-    db_file_name_and_uuid = ModelFile_name_and_uuid(file_name=filepath,
+    file_name_and_uuid = ModelFile_name_and_uuid(file_name=filepath,
                                                     binary_of_origin="fastq",
                                                     file_uuid=uuid4())
-    db.session.add(db_file_name_and_uuid)
-    db.session.commit()
-    fastq_id = db_file_name_and_uuid.id
+    db_file_name_and_uuid = await create_file_name_and_uuid_entries(file_name_and_uuid)#not sure if calling await here is smart
+    fastq_id = db_file_name_and_uuid.id #get insertion id of file_name object in postgresdb
 
     reads = get_fastq_metrics(filepath)
-
-    for read in reads:
+    for read in reads: # i wanted to refactor this to bulk insert, but multiple session.add() before session.commit() does exactly that
         for key, value in read.items():
             if key != "sequence_id":
-                db_binary_results = ModelBinary_results(sequence_id = read["sequence_id"],
+                db_binary_results = ModelBinary_result(sequence_id = read["sequence_id"],
                                                         file_id=fastq_id,
                                                         name=str(key),
                                                         type=str(type(value)),
@@ -228,7 +238,7 @@ async def create_sam_enries(filepath: Union[str]):
 
     entry_count = 0
     for alignment in binary_results["alignments"]:
-        db_binary_results = ModelBinary_results(sequence_id=alignment["sequence_id"],
+        db_binary_results = ModelBinary_result(sequence_id=alignment["sequence_id"],
                                                 file_id=sam_id,
                                                 name="position_in_ref",
                                                 type=str(type(alignment["position_in_ref"])),
@@ -238,7 +248,7 @@ async def create_sam_enries(filepath: Union[str]):
         db.session.commit()
         entry_count += 1
 
-        db_binary_results = ModelBinary_results(sequence_id=alignment["sequence_id"],
+        db_binary_results = ModelBinary_result(sequence_id=alignment["sequence_id"],
                                                 file_id=sam_id,
                                                 name="mapping_qual",
                                                 type=str(type(alignment["mapping_qual"])),
@@ -250,7 +260,7 @@ async def create_sam_enries(filepath: Union[str]):
 
         mapping_tags = alignment["mapping_tags"]
         for mapping_tag in mapping_tags:
-            db_binary_results = ModelBinary_results(sequence_id=alignment["sequence_id"],
+            db_binary_results = ModelBinary_result(sequence_id=alignment["sequence_id"],
                                                     file_id=sam_id,
                                                     name=mapping_tag,
                                                     type=str(type(mapping_tags[mapping_tag])),
@@ -278,7 +288,7 @@ async def create_kraken_entries(filepath: Union[str]):
     for classification in kraken_results:
         for key in classification.keys():
             if key != "sequence_id":
-                db_binary_results = ModelBinary_results(sequence_id=classification["sequence_id"],
+                db_binary_results = ModelBinary_result(sequence_id=classification["sequence_id"],
                                                         file_id=file_id,
                                                         name=str(key),
                                                         type=str(type(classification[key])),

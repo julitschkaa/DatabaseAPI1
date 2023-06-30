@@ -5,7 +5,7 @@ from sqlalchemy.orm import relationship, Mapped
 Base = declarative_base()
 
 
-class Binary_results(Base) :
+class Binary_result(Base) :
     __tablename__ = 'binary_results'
     id = Column(Integer, primary_key=True, index=True)#same here ist das ding noetig??
     sequence_id = Column(String)
@@ -16,7 +16,7 @@ class Binary_results(Base) :
 
     file_name_and_uuid = relationship('File_name_and_uuid')
 
-sequence_id_index = Index('sequence_id_index', Binary_results.sequence_id, postgresql_using='hash')
+sequence_id_index = Index('sequence_id_index', Binary_result.sequence_id, postgresql_using='hash')
 
 
 class File_name_and_uuid(Base) :
@@ -25,4 +25,5 @@ class File_name_and_uuid(Base) :
     file_name = Column(String)
     binary_of_origin = Column(String)
     file_uuid = Column(String)
+
 

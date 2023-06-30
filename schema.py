@@ -19,3 +19,10 @@ class File_name_and_uuid(BaseModel):
 
     class Config:
         orm_mode = True
+
+class Dimension(BaseModel):
+    name: str
+    type: str
+
+    class Config:
+        orm_mode = True
