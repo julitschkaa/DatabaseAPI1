@@ -6,3 +6,4 @@ Current ERD:
 to start:  
 1. start mongoDB
 2. ```uvicorn main:app --reload --port 8080```
+![screenshot of flatfiledb endpoints](images/Screenshot_of_actualflatfile_API.png "Endpoints of flatfile db API")
