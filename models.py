@@ -34,7 +34,7 @@ class FastqReadModel(BaseModel):
     min_quality: int = Field(...)
     max_quality: int = Field(...)
     average_quality: float = Field(...)
-    phred_quality: str = Field(...)
+    phred_quality: list = Field(...)
     file_name: str = Field(...)  # could be session id instead?
 
     class Config:

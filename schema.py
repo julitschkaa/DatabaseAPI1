@@ -11,7 +11,7 @@ class FastqRead(BaseModel):
     min_quality: int
     max_quality: int
     average_quality: float
-    phred_quality: str
+    phred_quality: list
     binary_results: list
     file_name: str
 

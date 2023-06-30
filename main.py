@@ -193,7 +193,7 @@ async def upload_fastq(filepath: Union[str]):
                                              min_quality=int(read["min_quality"]),
                                              max_quality=int(read["max_quality"]),
                                              average_quality=float(read["average_quality"]),
-                                             phred_quality=str(read["phred_quality"]),
+                                             phred_quality=read["phred_quality"],
                                              file_name=filepath
                                              ))
 
