@@ -11,19 +11,19 @@ Base  = declarative_base()
 
 class Raw_data(Base):
     __tablename__ = 'raw_data'
-    id  = Column(Integer, primary_key=True, index=True)#brauchht's das hier überhaupt wenn Pk=seq_id?
-    sequence_id = Column(String)
-    sequence = Column(String)
-    sequence_length = Column(Integer)#new
-    min_quality = Column(Integer)#new
-    max_quality = Column(Integer)#new
-    average_quality = Column(Float)#new
-    phred_quality = Column(String)
-    file_id = Column(Integer, ForeignKey('file_name_and_uuid.id'))
+    id = Column(Integer, primary_key=True, index=True, name='id')
+    sequence_id = Column(String, unique=True, name='sequence_id')#make sure every read is only present once in
+    sequence = Column(String, name='sequence')
+    sequence_length = Column(Integer,  name='sequence_length')#new
+    min_quality = Column(Integer,  name='min_quality')#new
+    max_quality = Column(Integer, name='max_quality')#new
+    average_quality = Column(Float, name='average_quality')#new
+    phred_quality = Column(String, name='phred_quality')
+    file_id = Column(Integer, ForeignKey('file_name_and_uuid.id'), name='file_id')
     #smart would be to initialise this with an empty list of binary results, but alembic doesnt let me
     file_name_and_uuid = relationship('File_name_and_uuid')
 
-class Binary_results(Base) :
+class Binary_result(Base) :
     __tablename__ = 'binary_results'
     id = Column(Integer, primary_key=True, index=True)#same here ist das ding noetig??
     sequence_id = Column(String)

@@ -33,3 +33,40 @@ class File_name_and_uuid(BaseModel):
 
     class Config:
         orm_mode = True
+
+class Dimension(BaseModel):
+    name: str
+    type: str
+
+    class Config:
+        orm_mode = True
+
+class OneDimension(BaseModel):
+    sequence_id: str
+    name: str
+    value: float
+
+    class Config:
+        orm_mode = True
+
+class TwoDimensions(BaseModel):
+    sequence_id: str
+    name1: str
+    value1: float
+    name2: str
+    value2: float
+
+    class Config:
+        orm_mode = True
+
+class ThreeDimensions(BaseModel):
+    sequence_id: str
+    name1: str
+    value1: float
+    name2: str
+    value2: float
+    name3: str
+    value3: float
+
+    class Config:
+        orm_mode = True
