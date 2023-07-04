@@ -158,8 +158,18 @@ async def get_one_dimension(dimension_name: str, percentage: int):
     #temp = db.session.query(ModelBinary_result.sequence_id, ModelBinary_result.name, ModelBinary_result.value).filter(ModelBinary_result.name == dimension_name)#RecursionError: maximum recursion depth exceeded in comparison
     return filtered_binary_result_list
 
+@app.get('/get_two_dimensions/{dimension1_name}/{dimension2_name}/{percentage}', response_description="get two dimensions of x percent of all reads",
+         response_model=None, status_code=status.HTTP_200_OK)#TODO returns list of list not so pretty
+async def get_two_dimension(dimension1_name: str, dimension2_name: str, percentage: int):
+    reads, list_binary_results = await get_random_reads(percentage)
+    filtered_binary_result_list=[]
+    for list in list_binary_results:
+        filtered_binary_result_list.append(x for x in list if x.name in [dimension1_name, dimension2_name])
+    #temp = db.session.query(ModelBinary_result.sequence_id, ModelBinary_result.name, ModelBinary_result.value).filter(ModelBinary_result.name == dimension_name)#RecursionError: maximum recursion depth exceeded in comparison
+    return filtered_binary_result_list
 
-@app.get('/get_two_dimensions/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}', response_description="get one dimension of x percent of all reads",
+
+@app.get('/get_three_dimensions/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}', response_description="get three dimensions of x percent of all reads",
          response_model=None, status_code=status.HTTP_200_OK)#TODO returns list of list not so pretty
 async def get_two_dimension(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
     reads, list_binary_results = await get_random_reads(percentage)
