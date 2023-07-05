@@ -1,3 +1,4 @@
+import re
 from typing import Union, List, Any
 
 import uvicorn
@@ -22,6 +23,8 @@ from schema import OneDimension as SchemaOneDimension
 from models import Raw_data as ModelRaw_data
 from models import Binary_result as ModelBinary_result
 from models import File_name_and_uuid as ModelFile_name_and_uuid
+
+from typehelper import typecast
 
 import os
 from dotenv import load_dotenv
@@ -208,24 +211,28 @@ async def post_binary_result(binary_result: SchemaBinary_result):
     return db_binary_result
 
 
-@app.get('/read_inlc_binary_results/{sequence_id}', response_description="get read including all binary entries by sequence_id")
+@app.get('/read_inlc_binary_results/{sequence_id}', response_description="get read including adjacent binary entries")
 async def get_entries_by_sequence_id(sequence_id: Union[str]):
-    raw_data = db.session.query(ModelRaw_data).all()  # TODO join tables on sequence id
-    raw_data_results = [read for read in raw_data if read.sequence_id == sequence_id]
-    if len(raw_data_results) == 0:
+    joined_data = db.session.query(ModelRaw_data, ModelBinary_result).join(ModelRaw_data.binary_results)\
+        .filter(ModelRaw_data.sequence_id==sequence_id)
+
+    if joined_data.count() == 0:
         return status.HTTP_404_NOT_FOUND
-    binary_data = db.session.query(ModelBinary_result).all()
-    binary_results = [entry for entry in binary_data if entry.sequence_id == sequence_id]
-    combined_results = {}
-    if len(binary_results) > 0:
-        for read in raw_data_results:
-            combined_results[read] = binary_results
 
-    # jointtables = db.session.query(ModelRaw_data).outerjoin(ModelBinary_results, ModelRaw_data.sequence_id==ModelBinary_results.sequence_id) #it says first here because "maximum recursion  depth exceeded error" otherwise
-    # results = db.session.query(ModelRaw_data).filter(ModelRaw_data.sequence_id==dsequence_id).first() #it says first here because "maximum recursion  depth exceeded error" otherwise
+    readObject = {'sequence_id' : joined_data.first()[0].sequence_id,#only returning the pretty data  <3
+                  'sequence' : joined_data.first()[0].sequence,
+                  'sequence_length': joined_data.first()[0].sequence_length,
+                  'min_quality': joined_data.first()[0].min_quality,
+                  'max_quality': joined_data.first()[0].max_quality,
+                  'average_quality': joined_data.first()[0].average_quality,
+                  'phred_quality': joined_data.first()[0].phred_quality
+                  }
+    for entry in joined_data.all():#now adding the binary_data entries for that read_object
+        readObject[entry[1].name] = typecast(entry[1].type, entry[1].value)
+        #readObject[entry[1].name] = entry[1].type+"("+entry[1].value+")" #this works but is ugly af
+        #readObject[entry[1].name] = entry[1].type(entry[1].value)#TypeError: 'str' object is not callable
 
-    return raw_data_results, binary_results
-
+    return readObject
 
 @app.get('/raw_data/', response_description="list all reads in raw data table", response_model=List[SchemaRaw_data])
 async def list_raw_data_entries():
@@ -346,20 +353,23 @@ async def create_sam_enries(filepath: Union[str]):
 
     entry_count = 0
     for alignment in binary_results["alignments"]:
+        raw_data_id = db.session.query(ModelRaw_data.id).filter(ModelRaw_data.sequence_id==alignment["sequence_id"])
         db_binary_results = ModelBinary_result(sequence_id=alignment["sequence_id"],
-                                               type=str(type(alignment["position_in_ref"])),
+                                               type=re.split("'", str(type(alignment["position_in_ref"])))[1],
                                                name="position_in_ref",
                                                value=alignment["position_in_ref"],
-                                               file_id=sam_id)
+                                               file_id=sam_id,
+                                               raw_data_id=raw_data_id)
         db.session.add(db_binary_results)
         db.session.commit()
         entry_count += 1
 
         db_binary_results = ModelBinary_result(sequence_id=alignment["sequence_id"],
-                                               type=str(type(alignment["mapping_qual"])),
+                                               type=re.split("'", str(type(alignment["mapping_qual"])))[1],
                                                name="mapping_qual",
                                                value=alignment["mapping_qual"],
-                                               file_id=sam_id)
+                                               file_id=sam_id,
+                                               raw_data_id=raw_data_id)
         db.session.add(db_binary_results)
         db.session.commit()
         entry_count += 1
@@ -367,10 +377,11 @@ async def create_sam_enries(filepath: Union[str]):
         mapping_tags = alignment["mapping_tags"]
         for mapping_tag in mapping_tags:
             db_binary_results = ModelBinary_result(sequence_id=alignment["sequence_id"],
-                                                   type=str(type(mapping_tags[mapping_tag])),
+                                                   type=re.split("'", str(type(mapping_tags[mapping_tag])))[1],
                                                    name=mapping_tag,
                                                    value=mapping_tags[mapping_tag],
-                                                   file_id=sam_id)
+                                                   file_id=sam_id,
+                                               raw_data_id=raw_data_id)
             db.session.add(db_binary_results)
             db.session.commit()
             entry_count += 1
@@ -390,13 +401,15 @@ async def create_kraken_entries(filepath: Union[str]):
     entry_count = 0
 
     for classification in kraken_results:
+        raw_data_id = db.session.query(ModelRaw_data.id).filter(ModelRaw_data.sequence_id==classification["sequence_id"])
         for key in classification.keys():
             if key != "sequence_id":
                 db_binary_results = ModelBinary_result(sequence_id=classification["sequence_id"],
-                                                       type=str(type(classification[key])),
+                                                       type=re.split("'",str(type(classification[key])))[1],
                                                        name=str(key),
                                                        value=str(classification[key]),
-                                                       file_id=file_id)
+                                                       file_id=file_id,
+                                                       raw_data_id=raw_data_id)
                 db.session.add(db_binary_results)
                 db.session.commit()
                 entry_count += 1

@@ -22,6 +22,7 @@ class Raw_data(Base):
     file_id = Column(Integer, ForeignKey('file_name_and_uuid.id'), name='file_id')
     #smart would be to initialise this with an empty list of binary results, but alembic doesnt let me
     file_name_and_uuid = relationship('File_name_and_uuid')
+    binary_results = relationship('Binary_result', back_populates='raw_data')
 
 class Binary_result(Base) :
     __tablename__ = 'binary_results'
@@ -31,8 +32,10 @@ class Binary_result(Base) :
     name = Column(String)
     value = Column(String)
     file_id = Column(Integer, ForeignKey('file_name_and_uuid.id'))
+    raw_data_id = Column(Integer, ForeignKey('raw_data.id'))
 
     file_name_and_uuid = relationship('File_name_and_uuid')
+    raw_data = relationship('Raw_data', back_populates='binary_results')
 
 
 

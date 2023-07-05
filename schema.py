@@ -22,6 +22,7 @@ class Binary_results(BaseModel):
     name: str
     value: str
     file_id: int
+    raw_data_id:  int
 
     class Config:
         orm_mode = True
