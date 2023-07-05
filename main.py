@@ -1,3 +1,5 @@
+from functools import reduce
+
 import pymongo
 import uvicorn
 import requests
@@ -120,14 +122,36 @@ async def call_binary_api(endpoint: Union[str], params: dict[str, str]):
     response = requests.get(url=binary_api_url + endpoint, params=params)
     return response
 
-@app.get("/dimensions/")
-async def get_all_field_names():#TODO doesnt work yet
-    field_names =[]
-    cursor=db['all_docs'].find()
-    for document in cursor:
-        field_names.append(type(document))
-    return field_names
+@app.get("/dimensions/", response_description="returns list of all dimensions currently present in database",
+         status_code=status.HTTP_200_OK,
+         response_model=List[str]
+         )
+async def list_all_possible_dimensions():#TODO type of perspective fields would be nice as well
+    all_keys = reduce(lambda all_keys, rec_keys: all_keys | set(rec_keys), map(lambda d: d.keys(), db['all_docs'].find()), set())
+    return all_keys
 
+@app.get("/read_count/", response_description="returns count of available reads in data base",
+         status_code=status.HTTP_200_OK,
+         response_model=int
+         )#TODO better exceptionhandling?
+async def get_read_count():
+    read_count = len(db["all_docs"].distinct('sequence_id'))
+    return read_count
+
+@app.get('/random_x_percent/{percentage}', response_description="get x percent of all reads, randomly selected",
+         status_code=status.HTTP_200_OK)
+async def get_random_reads(percentage: int):
+    alll_reads_random_order = db['all_docs'].distinct('sequence_id').oder_by(func)
+    all_reads_random_order = db.session.query(ModelBinary_result.sequence_id, func.random()).distinct().order_by(func.random())
+    read_count = await get_read_count()
+    x = int(read_count*percentage/100)
+    if x<1:
+        raise HTTPException(status_code=406, detail=f"{percentage}percent results in less than 1 out of {read_count}reads. there are not enough reads in the database yet. please add reads or choose higher percentage")
+    random_reads = all_reads_random_order[:x]
+    random_binary_results = []
+    for read in random_reads:
+        random_binary_results.append(await list_binary_results_by_seq_id(read[0]))
+    return random_binary_results
 
 @app.post('/document/', response_description="Add new Document", response_model=BaseModel)
 async def create_document(document: BaseModel = Body(...)):
