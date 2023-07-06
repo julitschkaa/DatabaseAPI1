@@ -1,4 +1,5 @@
-from typing import Union, List, Any
+import re
+from typing import Union, List
 
 import uvicorn
 import http3
@@ -8,21 +9,22 @@ from uuid import uuid4
 
 from fastapi import FastAPI, status, HTTPException
 from fastapi_sqlalchemy import DBSessionMiddleware, db
-from requests import Response
+
 from sqlalchemy import func
 
 from Datafile_API.fastq_parser import get_fastq_metrics
 from Datafile_API.sam_parser import get_sam_metrics
 from Datafile_API.kraken2_script import get_kraken_metrics
 
-from schema import Binary_results as SchemaBinary_result
-from schema import Dimension as SchemaDimension
-from schema import File_name_and_uuid as SchemaFile_name_and_uuid
-from models import Binary_result as ModelBinary_result
-from models import File_name_and_uuid as ModelFile_name_and_uuid
+from schema import BinaryResults as SchemaBinaryResult
+from schema import FileNameAndUuid as SchemaFileNameAndUuid
+from models import BinaryResult as ModelBinaryResult
+from models import FileNameAndUuid as ModelFileNameAndUuid
 
 import os
 from dotenv import load_dotenv
+
+from typehelper import typecast
 
 load_dotenv('.env')
 
@@ -110,10 +112,10 @@ async def call_binary_api(endpoint: Union[str], params: dict[str, str]):
 
 @app.get("/dimensions/", response_description="a list of dimensions currently saved in postgres db",
          status_code=status.HTTP_200_OK,
-         response_model=List[SchemaDimension]
+         response_model=dict
          )
-async def list_all_possible_dimensions():#TODO dimensions as json objects not ideal. dict would be nice?
-    dimensions_names = db.session.query(ModelBinary_result.name,ModelBinary_result.type).distinct().all()
+async def list_all_possible_dimensions():
+    dimensions_names = db.session.query(ModelBinaryResult.name, ModelBinaryResult.type).distinct().all()
     if not dimensions_names:
         raise HTTPException(status_code=404, detail="no dimensions found")
     return dimensions_names
@@ -121,74 +123,90 @@ async def list_all_possible_dimensions():#TODO dimensions as json objects not id
 @app.get("/read_count/", response_description="returns count of available reads in data base",
          status_code=status.HTTP_200_OK)#TODO better exceptionhandling
 async def get_read_count():
-    read_count = db.session.query(ModelBinary_result.sequence_id).distinct().count()
+    read_count = db.session.query(ModelBinaryResult.sequence_id).distinct().count()
     return read_count
 
 @app.get('/random_x_percent/{percentage}', response_description="get x percent of all reads, randomly selected",
          status_code=status.HTTP_200_OK)
 async def get_random_reads(percentage: int):
-    all_reads_random_order = db.session.query(ModelBinary_result.sequence_id, func.random()).distinct().order_by(func.random())
+    if percentage > 100:
+        raise HTTPException(status_code=406, detail=f"Sorry, I cant get you more than 100% of all reads")
     read_count = await get_read_count()
-    x = int(read_count*percentage/100)
-    if x<1:
+    number_of_reads_requested = int(read_count*percentage/100)
+    if number_of_reads_requested<1:
         raise HTTPException(status_code=406, detail=f"{percentage}percent results in less than 1 out of {read_count}reads. there are not enough reads in the database yet. please add reads or choose higher percentage")
-    random_reads = all_reads_random_order[:x]
-    random_binary_results = []
-    for read in random_reads:
-        random_binary_results.append(await list_binary_results_by_seq_id(read[0]))
-    return random_binary_results
+    all_sequence_ids_random_order = db.session.query(ModelBinaryResult.sequence_id, func.random()).distinct().order_by(func.random())
+    random_sequence_ids = all_sequence_ids_random_order[:number_of_reads_requested]
+    random_reads = []
+    for row in random_sequence_ids:
+        random_reads.append(await get_entries_by_seq_id(row[0]))
+    return random_reads
 
-@app.get('/get_one_dimension/{dimension_name}/{percentage}', response_description="get one dimension of x percent of all reads",
-         response_model=None, status_code=status.HTTP_200_OK)#TODO returns list of list not so pretty!!
+@app.get('/get_one_dimension/{dimension_name}/{percentage}',
+         response_description="get one dimension of x percent of all reads",
+         response_model=list, status_code=status.HTTP_200_OK)
 async def get_one_dimension(dimension_name: str, percentage: int):
-    list_binary_results = await get_random_reads(percentage)
-    filtered_binary_result_list=[]
-    for list in list_binary_results:
-        filtered_binary_result_list.append((x.sequence_id,x.name,x.value) for x in list if x.name==dimension_name)
-    #temp = db.session.query(ModelBinary_result.sequence_id, ModelBinary_result.name, ModelBinary_result.value).filter(ModelBinary_result.name == dimension_name)#RecursionError: maximum recursion depth exceeded in comparison
-    return filtered_binary_result_list
+    random_reads = await get_random_reads(percentage)
+    return_list = []
+    for read in random_reads:
+        return_list.append({
+            'sequence_id': read['sequence_id'],  # hardcoded because needed for later referencing
+            dimension_name: read[dimension_name]
+        })
+    return return_list
 
 
-@app.get('/get_two_dimensions/{dimension1_name}/{dimension2_name}/{percentage}', response_description="get two dimensions of x percent of all reads",
-         response_model=None, status_code=status.HTTP_200_OK)#TODO returns list of list not so pretty
+@app.get('/get_two_dimensions/{dimension1_name}/{dimension2_name}/{percentage}',
+         response_description="get two dimensions of x percent of all reads",
+         response_model=list, status_code=status.HTTP_200_OK)
 async def get_two_dimension(dimension1_name: str, dimension2_name: str, percentage: int):
-    list_binary_results = await get_random_reads(percentage)
-    filtered_binary_result_list=[]
-    for list in list_binary_results:
-        filtered_binary_result_list.append(x for x in list if x.name in [dimension1_name, dimension2_name])
-    #temp = db.session.query(ModelBinary_result.sequence_id, ModelBinary_result.name, ModelBinary_result.value).filter(ModelBinary_result.name == dimension_name)#RecursionError: maximum recursion depth exceeded in comparison
-    return filtered_binary_result_list
+    random_reads = await get_random_reads(percentage)
+    return_list = []
+    for read in random_reads:
+        return_list.append({
+            'sequence_id': read['sequence_id'],  # hardcoded because needed for later referencing
+            dimension1_name: read[dimension1_name],
+            dimension2_name: read[dimension2_name]
+        })
+    return return_list
 
-@app.get('/get_three_dimensions/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}', response_description="get three dimensions of x percent of all reads",
-         response_model=None, status_code=status.HTTP_200_OK)#TODO returns list of list not so pretty
-async def get_three_dimensions(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
-    list_binary_results = await get_random_reads(percentage)
-    filtered_binary_result_list=[]
-    for list in list_binary_results:
-        filtered_binary_result_list.append(x for x in list if x.name in [dimension1_name, dimension2_name, dimension3_name])
-    #temp = db.session.query(ModelBinary_result.sequence_id, ModelBinary_result.name, ModelBinary_result.value).filter(ModelBinary_result.name == dimension_name)#RecursionError: maximum recursion depth exceeded in comparison
-    return filtered_binary_result_list
+
+@app.get('/get_three_dimensions/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}',
+         response_description="get three dimensions of x percent of all reads",
+         response_model=list, status_code=status.HTTP_200_OK)
+async def get_two_dimension(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
+    random_reads = await get_random_reads(percentage)
+    return_list = []
+    for read in random_reads:
+        return_list.append({
+            'sequence_id': read['sequence_id'],  # hardcoded because needed for later referencing
+            dimension1_name: read[dimension1_name],
+            dimension2_name: read[dimension2_name],
+            dimension3_name: read[dimension3_name]
+        })
+    return return_list
 
 @app.post('/binary_result/', response_description="write entries to binary_result table"
-    , response_model=SchemaBinary_result, status_code=status.HTTP_201_CREATED)
-async def post_binary_result(binary_result: SchemaBinary_result):
-    db_binary_result = ModelBinary_result(sequence_id=binary_result.sequence_id,
-                                     type=binary_result.type,
-                                     name=binary_result.name,
-                                     value=binary_result.value,
-                                     file_id=create_file_name_and_uuid_entries)
+    , response_model=SchemaBinaryResult, status_code=status.HTTP_201_CREATED)
+async def post_binary_result(binary_result: SchemaBinaryResult):
+    db_binary_result = ModelBinaryResult(sequence_id=binary_result.sequence_id,
+                                         type=binary_result.type,
+                                         name=binary_result.name,
+                                         value=binary_result.value,
+                                         file_id=create_file_name_and_uuid_entries)
     db.session.add(db_binary_result)
     db.session.commit()
     return db_binary_result
 
 @app.post('/binary_results/', response_description="write entries to binary_result table"
-    , response_model=List[SchemaBinary_result], status_code=status.HTTP_201_CREATED)
-async def post_binary_result(binary_results: List[SchemaBinary_result]):
+    , response_model=List[SchemaBinaryResult], status_code=status.HTTP_201_CREATED)
+async def post_binary_results(binary_results: List[SchemaBinaryResult]):
     db.session.add_all(binary_results)
     db.session.commit()
     return status.HTTP_201_CREATED
 
-@app.delete('/binary_results_by_id/{sequence_id}', response_description="delete all entries with matching id in binary_results table")
+@app.delete('/binary_results_by_id/{sequence_id}', response_description="delete all entries with matching id "
+                                                                        "in binary_results table")
 async def delete_binary_results_by_id(sequence_id: Union[str]):
     to_be_deleted_list = await list_binary_results(sequence_id)
     if not to_be_deleted_list:
@@ -200,7 +218,7 @@ async def delete_binary_results_by_id(sequence_id: Union[str]):
 
 @app.delete('/delete_binary_results/', response_description="delete all entries in binary_results table")
 async def delete_all_binary_results():#TODO add exceptionhandling and better return status
-    modifiedcount = db.session.query(ModelBinary_result).delete()
+    modifiedcount = db.session.query(ModelBinaryResult).delete()
     if modifiedcount < 1:
         raise HTTPException(status_code=404, detail="no entries ind binary_results found")
     db.session.commit()
@@ -208,7 +226,7 @@ async def delete_all_binary_results():#TODO add exceptionhandling and better ret
 
 @app.delete('/filename_and_uuid/', response_description="delete all entries in file_name_and_uuid table")
 async def delete_all_filename_and_uuid():
-    modifiedcount  = db.session.query(ModelFile_name_and_uuid).delete()
+    modifiedcount  = db.session.query(ModelFileNameAndUuid).delete()
     if modifiedcount < 1:
         raise HTTPException(status_code=404, detail="no entries ind file_name_and_uuid found")
     db.session.commit()
@@ -217,36 +235,42 @@ async def delete_all_filename_and_uuid():
 
 
 @app.get('/binary_results_by_seq_id/',
-         response_description="list all reads with matching seq_id in binary_results table",
-         response_model=List[SchemaBinary_result])
-async def list_binary_results_by_seq_id(sequence_id: Union[str]):
-    binary_results = db.session.query(ModelBinary_result).filter_by(sequence_id=sequence_id).all()
+         response_description="get read with matching seq_id in binary_results table",
+         response_model=dict)
+async def get_entries_by_seq_id(sequence_id: Union[str]):
+    binary_results = db.session.query(ModelBinaryResult).filter_by(sequence_id=sequence_id).all()
     if not binary_results:
         raise HTTPException(status_code=404, detail="no binary results with matching sequence_id found")
-    return binary_results
+    readObject = {
+        'sequence_id':sequence_id
+    }
+    for entry in binary_results:
+        readObject[entry.name] = typecast(entry.type, entry.value)
+
+    return readObject
 
 @app.get('/binary_results/',
          response_description="list all binary_results",
-         response_model=List[SchemaBinary_result])
+         response_model=List[SchemaBinaryResult])
 async def list_binary_results():
-    binary_results = db.session.query(ModelBinary_result).all()
+    binary_results = db.session.query(ModelBinaryResult).all()
     if not binary_results:
         raise HTTPException(status_code=404, detail="no binary results found")
     return binary_results
 
 
 @app.get('/file_name_and_uuid/', response_description="list all entries in file_name_and_id",
-         response_model=List[SchemaFile_name_and_uuid])
+         response_model=List[SchemaFileNameAndUuid])
 async def list_file_name_and_uuid():
-    file_name_and_uuids = db.session.query(ModelFile_name_and_uuid).all()
+    file_name_and_uuids = db.session.query(ModelFileNameAndUuid).all()
     if not file_name_and_uuids:
         raise HTTPException(status_code=204, detail="no entries in file_name_uuid found")
     return file_name_and_uuids
 
 
 @app.post('/file_name_and_uuid/', response_description="write entries to file_name_and_id table",
-          response_model=SchemaFile_name_and_uuid, status_code=status.HTTP_201_CREATED)
-async def create_file_name_and_uuid_entries(db_file_name_and_uuid: SchemaFile_name_and_uuid):
+          response_model=SchemaFileNameAndUuid, status_code=status.HTTP_201_CREATED)
+async def create_file_name_and_uuid_entries(db_file_name_and_uuid: SchemaFileNameAndUuid):
     db.session.add(db_file_name_and_uuid)
     db.session.commit()
     return db_file_name_and_uuid
@@ -254,22 +278,24 @@ async def create_file_name_and_uuid_entries(db_file_name_and_uuid: SchemaFile_na
 
 @app.post('/fastq/', status_code=status.HTTP_201_CREATED)  # TODO: check if file is already in filename_and_uuid_table
 async def create_fastq_entries(filepath: Union[str]):
-    file_name_and_uuid = ModelFile_name_and_uuid(file_name=filepath,
-                                                    binary_of_origin="fastq",
-                                                    file_uuid=uuid4())
-    db_file_name_and_uuid = await create_file_name_and_uuid_entries(file_name_and_uuid)#not sure if calling await here is smart
+    file_name_and_uuid = ModelFileNameAndUuid(file_name=filepath,
+                                              binary_of_origin="fastq",
+                                              file_uuid=uuid4())
+    db_file_name_and_uuid = await create_file_name_and_uuid_entries(file_name_and_uuid)#not sure if calling await here
+    # is smart
     fastq_id = db_file_name_and_uuid.id #get insertion id of file_name object in postgresdb
 
     reads = get_fastq_metrics(filepath)
-    for read in reads: # i wanted to refactor this to bulk insert, but multiple session.add() before session.commit() does exactly that
+    for read in reads: # i wanted to refactor this to bulk insert, but multiple session.add() before session.commit()
+        # does exactly that
         for key, value in read.items():
             if key != "sequence_id":
-                db_binary_results = ModelBinary_result(sequence_id = read["sequence_id"],
-                                                        file_id=fastq_id,
-                                                        name=str(key),
-                                                        type=str(type(value)),
-                                                        value=str(value)
-                                                        )
+                db_binary_results = ModelBinaryResult(sequence_id = read["sequence_id"],
+                                                      file_id=fastq_id,
+                                                      name=str(key),
+                                                      type=re.split("'", str(type(value)))[1],
+                                                      value=str(value)
+                                                      )
                 db.session.add(db_binary_results)
         db.session.commit()
     return {'added ' + str(len(reads)) + ' reads to postgresDB'}
@@ -280,43 +306,43 @@ async def create_sam_enries(filepath: Union[str]):
     binary_results = get_sam_metrics(filepath)
 
     file_name = binary_results["mapping_reference_file"]
-    db_file_name_and_uuid = ModelFile_name_and_uuid(file_name=file_name,
-                                                    binary_of_origin=binary_results["binary_of_origin"],
-                                                    file_uuid=uuid4())
+    db_file_name_and_uuid = ModelFileNameAndUuid(file_name=file_name,
+                                                 binary_of_origin=binary_results["binary_of_origin"],
+                                                 file_uuid=uuid4())
     db.session.add(db_file_name_and_uuid)
     db.session.commit()
     sam_id = db_file_name_and_uuid.id
 
     entry_count = 0
     for alignment in binary_results["alignments"]:
-        db_binary_results = ModelBinary_result(sequence_id=alignment["sequence_id"],
-                                                file_id=sam_id,
-                                                name="position_in_ref",
-                                                type=str(type(alignment["position_in_ref"])),
-                                                value=alignment["position_in_ref"]
-                                                )
+        db_binary_results = ModelBinaryResult(sequence_id=alignment["sequence_id"],
+                                              file_id=sam_id,
+                                              name="position_in_ref",
+                                              type=re.split("'", str(type(alignment["position_in_ref"])))[1],
+                                              value=alignment["position_in_ref"]
+                                              )
         db.session.add(db_binary_results)
         db.session.commit()
         entry_count += 1
 
-        db_binary_results = ModelBinary_result(sequence_id=alignment["sequence_id"],
-                                                file_id=sam_id,
-                                                name="mapping_qual",
-                                                type=str(type(alignment["mapping_qual"])),
-                                                value=alignment["mapping_qual"]
-                                                )
+        db_binary_results = ModelBinaryResult(sequence_id=alignment["sequence_id"],
+                                              file_id=sam_id,
+                                              name="mapping_qual",
+                                              type=re.split("'", str(type(alignment["mapping_qual"])))[1],
+                                              value=alignment["mapping_qual"]
+                                              )
         db.session.add(db_binary_results)
         db.session.commit()
         entry_count += 1
 
         mapping_tags = alignment["mapping_tags"]
         for mapping_tag in mapping_tags:
-            db_binary_results = ModelBinary_result(sequence_id=alignment["sequence_id"],
-                                                    file_id=sam_id,
-                                                    name=mapping_tag,
-                                                    type=str(type(mapping_tags[mapping_tag])),
-                                                    value=mapping_tags[mapping_tag]
-                                                    )
+            db_binary_results = ModelBinaryResult(sequence_id=alignment["sequence_id"],
+                                                  file_id=sam_id,
+                                                  name=mapping_tag,
+                                                  type=re.split("'", str(type(mapping_tags[mapping_tag])))[1],
+                                                  value=mapping_tags[mapping_tag]
+                                                  )
             db.session.add(db_binary_results)
             db.session.commit()
             entry_count += 1
@@ -328,9 +354,9 @@ async def create_kraken_entries(filepath: Union[str]):
     kraken_results = get_kraken_metrics(filepath)
 
     file_name = filepath
-    db_file_name_and_uuid = ModelFile_name_and_uuid(file_name=file_name,
-                                                    binary_of_origin="Kraken2",
-                                                    file_uuid=uuid4())
+    db_file_name_and_uuid = ModelFileNameAndUuid(file_name=file_name,
+                                                 binary_of_origin="Kraken2",
+                                                 file_uuid=uuid4())
     db.session.add(db_file_name_and_uuid)
     db.session.commit()
     file_id = db_file_name_and_uuid.id
@@ -339,12 +365,12 @@ async def create_kraken_entries(filepath: Union[str]):
     for classification in kraken_results:
         for key in classification.keys():
             if key != "sequence_id":
-                db_binary_results = ModelBinary_result(sequence_id=classification["sequence_id"],
-                                                        file_id=file_id,
-                                                        name=str(key),
-                                                        type=str(type(classification[key])),
-                                                        value=str(classification[key])
-                                                        )
+                db_binary_results = ModelBinaryResult(sequence_id=classification["sequence_id"],
+                                                      file_id=file_id,
+                                                      name=str(key),
+                                                      type=re.split("'", str(type(classification[key])))[1],
+                                                      value=str(classification[key])
+                                                      )
                 db.session.add(db_binary_results)
                 db.session.commit()
                 entry_count += 1
