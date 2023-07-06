@@ -17,7 +17,7 @@ def typecast(type: str, value: str):
         case "str":
             return str(value)
         case "list":
-            #return value.split(",")  # TODO: find better split parameter
+            #return value.split(",")  # find better split parameter
             return ast.literal_eval(value)#TODO:literal_eval not safe??
         case "tuple":
             return json.loads(value)# TODO:  test if this already does the trick
@@ -30,4 +30,4 @@ def typecast(type: str, value: str):
         case "set":
             return set(value)
         case "frozenset":
-            return set(value) #should this be frozen set instead?
+            return frozenset(set(value)) # TODO:  test if this already does the trick

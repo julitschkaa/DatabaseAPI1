@@ -8,7 +8,7 @@ def get_kraken_metrics(output:str):
         classification["classified"] = values[0]
         classification["sequence_id"] = values[1]
         classification["taxonomy_id"]=values[2]
-        #classification["sequence_length"]=values[3] #already present in fast-parser
+        #classification["sequence_length"]=values[3] #already present in fastq-parser
         classification["lca_mapping_list"]=values[4].split(" ")
         classifications.append(classification)
         if(len(classifications)==20):
