@@ -1,3 +1,4 @@
+import re
 from functools import reduce
 
 import pymongo
@@ -12,6 +13,7 @@ from typing import List, Union
 
 from pydantic import BaseModel
 from pymongo.mongo_client import MongoClient
+from sqlalchemy import func
 
 from Datafile_API.fastq_parser import get_fastq_metrics
 from Datafile_API.sam_parser import get_sam_metrics
@@ -123,12 +125,19 @@ async def call_binary_api(endpoint: Union[str], params: dict[str, str]):
     return response
 
 @app.get("/dimensions/", response_description="returns list of all dimensions currently present in database",
-         status_code=status.HTTP_200_OK,
-         response_model=List[str]
+         status_code=status.HTTP_200_OK
          )
-async def list_all_possible_dimensions():#TODO type of perspective fields would be nice as well
-    all_keys = reduce(lambda all_keys, rec_keys: all_keys | set(rec_keys), map(lambda d: d.keys(), db['all_docs'].find()), set())
-    return all_keys
+async def list_all_possible_dimensions():
+    all_keys = reduce(lambda all_keys, rec_keys: all_keys | set(rec_keys),
+                      map(lambda d: d.keys(), db['all_docs'].find()), set())
+    field_types = {}
+    for document in db['all_docs'].find():
+        for key in all_keys:
+            if key in document:
+                field_types[key] = re.split("'", str(type(document[key])))[1]
+
+    return field_types
+
 
 @app.get("/read_count/", response_description="returns count of available reads in data base",
          status_code=status.HTTP_200_OK,
@@ -141,16 +150,27 @@ async def get_read_count():
 @app.get('/random_x_percent/{percentage}', response_description="get x percent of all reads, randomly selected",
          status_code=status.HTTP_200_OK)
 async def get_random_reads(percentage: int):
-    alll_reads_random_order = db['all_docs'].distinct('sequence_id').oder_by(func)
-    all_reads_random_order = db.session.query(ModelBinary_result.sequence_id, func.random()).distinct().order_by(func.random())
+    if percentage > 100:
+        raise HTTPException(status_code=406, detail=f"sorry, I can't get you more than 100% of all reads")
     read_count = await get_read_count()
-    x = int(read_count*percentage/100)
-    if x<1:
-        raise HTTPException(status_code=406, detail=f"{percentage}percent results in less than 1 out of {read_count}reads. there are not enough reads in the database yet. please add reads or choose higher percentage")
-    random_reads = all_reads_random_order[:x]
+    x = int(read_count * percentage / 100)
+    if x < 1:
+        raise HTTPException(status_code=406,
+                            detail=f"{percentage}percent results in less than 1 out of {read_count}reads. ")
+    all_sequence_ids_random_order = db['all_docs'].distinct('sequence_id').oder_by(func)
+    #all_reads_random_order = db.session.query(ModelBinary_result.sequence_id, func.random()).distinct().order_by(func.random())
+    '''# Create the aggregation pipeline
+pipeline = [
+    {"$sample": {"size": num_documents}}
+]
+
+# Execute the aggregation pipeline
+random_documents = list(db['your_collection'].aggregate(pipeline))
+#might be better here??'''
+    random_sequence_ids = all_sequence_ids_random_order[:x]
     random_binary_results = []
-    for read in random_reads:
-        random_binary_results.append(await list_binary_results_by_seq_id(read[0]))
+    for read in random_sequence_ids:
+        random_binary_results.append(await get_read_by_seq_id(read[0]))
     return random_binary_results
 
 @app.post('/document/', response_description="Add new Document", response_model=BaseModel)
@@ -170,6 +190,38 @@ async def create_documents(documents: List[BaseModel] = Body(...)):
     return JSONResponse(status_code=status.HTTP_201_CREATED,
                         content=f"created {len(new_documents_ids_list)} new documents in eva_ngs collection")
 
+@app.get('/read_by:sequence_id/{sequence_id}', response_description="get read including adjacent binary entries")
+async def get_read_by_seq_id(sequence_id: Union[str]):
+    all_dimensions = reduce(lambda all_keys, rec_keys: all_keys.union(rec_keys),
+                            map(lambda d: set(d.keys()), db['all_docs'].find()), set())
+    all_documents_for_id = await get_documents_by_id(sequence_id)
+    read_object ={}
+    for document in all_documents_for_id:
+        for dimension in all_dimensions:
+            value = document.get(dimension)
+            if value is not None:
+                read_object[dimension] = value
+    return read_object
+@app.get("/reads/", response_description="list all read objects")
+async def get_all_reads():#TODO: aktuell wird file_id und anderes noch überschrieben mitkraken.txt o.ae noch anders haendeln
+    all_sequence_ids = db["all_docs"].distinct('sequence_id')
+    all_dimensions = reduce(lambda all_keys, rec_keys: all_keys.union(rec_keys),
+                            map(lambda d: set(d.keys()), db['all_docs'].find()), set())
+    all_read_objects = []
+
+    for sequence_id in all_sequence_ids:
+        read_object = {}
+        all_documents_for_id = await get_documents_by_id(sequence_id)
+
+        for document in all_documents_for_id:
+            for dimension in all_dimensions:
+                value = document.get(dimension)
+                if value is not None:
+                    read_object[dimension] = value
+
+        all_read_objects.append(read_object)
+
+    return all_read_objects
 
 @app.get("/documents/", response_description="list all documents", response_model=List[BaseModel])
 async def list_all_documents():
@@ -177,7 +229,7 @@ async def list_all_documents():
     for document in db["all_docs"].find():
         documents.append(document)
     if documents:
-        return JSONResponse(status_code=status.HTTP_200_OK, content=documents)
+        return documents
     raise HTTPException(status_code=status.HTTP_204_NO_CONTENT,
                         detail=f"looks like there are no documents in the database yet")
 
@@ -189,7 +241,7 @@ async def get_documents_by_id(sequence_id: str):
     for document in db["all_docs"].find({"sequence_id": sequence_id}):
         documents.append(document)
     if documents:
-        return JSONResponse(status_code=status.HTTP_200_OK, content=documents)
+        return documents
     raise HTTPException(status_code=404, detail=f"read {sequence_id} not found in database")
 
 
