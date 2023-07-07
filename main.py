@@ -140,7 +140,7 @@ async def list_all_possible_dimensions():
     binary_result_dimensions_names = db.session.query(ModelBinaryResult.name, ModelBinaryResult.type).distinct().all()
     combined_data_dimensions = {}
     for key, value in raw_data_sample_dict.items():
-        combined_data_dimensions[str(key)] = re.split("'", str(type(value)))[1]  # TODO not so pretty but hey...
+        combined_data_dimensions[str(key)] = re.split("'", str(type(value)))[1]  #TODO: remove sequence_id and id
     for item in binary_result_dimensions_names:
         combined_data_dimensions[item[0]] = item[1]
     if not combined_data_dimensions:
@@ -184,7 +184,7 @@ async def get_one_dimension(dimension_name: str, percentage: int):
 @app.get('/get_two_dimensions/{dimension1_name}/{dimension2_name}/{percentage}',
          response_description="get two dimensions of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
-async def get_two_dimension(dimension1_name: str, dimension2_name: str, percentage: int):
+async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percentage: int):
     random_reads = await get_random_reads(percentage)
     return_list = []
     for read in random_reads:
@@ -199,7 +199,7 @@ async def get_two_dimension(dimension1_name: str, dimension2_name: str, percenta
 @app.get('/get_three_dimensions/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}',
          response_description="get three dimensions of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
-async def get_two_dimension(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
+async def get_three_dimensions(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
     random_reads = await get_random_reads(percentage)
     return_list = []
     for read in random_reads:
@@ -255,7 +255,7 @@ async def get_entries_by_sequence_id(sequence_id: Union[str]):
                   'min_quality': joined_data.first()[0].min_quality,
                   'max_quality': joined_data.first()[0].max_quality,
                   'average_quality': joined_data.first()[0].average_quality,
-                  'phred_quality': joined_data.first()[0].phred_quality
+                  'phred_quality': typecast("list",joined_data.first()[0].phred_quality)#turn phred quality into list
                   }
     for entry in joined_data.all():  # now adding the binary_data entries for that read_object
         readObject[entry[1].name] = typecast(entry[1].type, entry[1].value)
