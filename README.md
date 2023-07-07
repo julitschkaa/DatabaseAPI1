@@ -11,4 +11,5 @@ to start:
 ![screenshot of three entity postgres API](images/main_endpoints.png "Screenshot of three entity postgres db API")
 5. now with added get dimensions endpoints.
 ![screenshot of threedimensionendpoint](images/main_get_dimensions.png "return format of get dimensions endpoint")
+6. please keep in mind, that "phred_quality is saved as "string" here, but is returned as list of ints in the actual endpoints
 ![screenshot of threedimensionendpoint2](images/main_get_one_dimension.png "get one dimensions endpoint")

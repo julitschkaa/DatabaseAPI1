@@ -140,7 +140,8 @@ async def list_all_possible_dimensions():
     binary_result_dimensions_names = db.session.query(ModelBinaryResult.name, ModelBinaryResult.type).distinct().all()
     combined_data_dimensions = {}
     for key, value in raw_data_sample_dict.items():
-        combined_data_dimensions[str(key)] = re.split("'", str(type(value)))[1]  #TODO: remove sequence_id and id
+        if str(key) not in ["id", "file_id", "sequence_id"]:#remove unecessary ids from output
+            combined_data_dimensions[str(key)] = re.split("'", str(type(value)))[1] #consider phred_quality is str here!
     for item in binary_result_dimensions_names:
         combined_data_dimensions[item[0]] = item[1]
     if not combined_data_dimensions:
@@ -255,7 +256,8 @@ async def get_entries_by_sequence_id(sequence_id: Union[str]):
                   'min_quality': joined_data.first()[0].min_quality,
                   'max_quality': joined_data.first()[0].max_quality,
                   'average_quality': joined_data.first()[0].average_quality,
-                  'phred_quality': typecast("list",joined_data.first()[0].phred_quality)#turn phred quality into list
+                  'phred_quality': typecast("list",joined_data.first()[0].phred_quality)#turn phred quality into list?
+                  #'phred_quality': joined_data.first()[0].phred_quality
                   }
     for entry in joined_data.all():  # now adding the binary_data entries for that read_object
         readObject[entry[1].name] = typecast(entry[1].type, entry[1].value)
@@ -303,9 +305,9 @@ async def delete_all_binary_results():  # TODO add exceptionhandling and better 
 
 @app.delete('/delete_raw_data/', response_description="delete all entries in raw_data table")
 async def delete_all_raw_data():  # TODO add exceptionhandling and better return status
-    modifiedcount = db.session.query(ModelRawData).delete()
-    if modifiedcount < 1:
-        raise HTTPException(status_code=404, detail="no entries ind raw_data found")
+    modified_count = db.session.query(ModelRawData).delete()
+    if modified_count < 1:
+        raise HTTPException(status_code=404, detail="no entries in raw_data found")
     db.session.commit()
     return status.HTTP_200_OK
 
