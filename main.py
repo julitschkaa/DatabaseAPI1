@@ -5,7 +5,7 @@ import pymongo
 import uvicorn
 import requests
 
-from fastapi import FastAPI, Body, HTTPException, status
+from fastapi import FastAPI, Body, HTTPException, status, Query
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
@@ -13,7 +13,6 @@ from typing import List, Union
 
 from pydantic import BaseModel
 from pymongo.mongo_client import MongoClient
-from sqlalchemy import func
 
 from Datafile_API.fastq_parser import get_fastq_metrics
 from Datafile_API.sam_parser import get_sam_metrics
@@ -153,25 +152,144 @@ async def get_random_reads(percentage: int):
     if percentage > 100:
         raise HTTPException(status_code=406, detail=f"sorry, I can't get you more than 100% of all reads")
     read_count = await get_read_count()
-    x = int(read_count * percentage / 100)
-    if x < 1:
+    num_documents = int(read_count * percentage / 100)
+    if num_documents < 1:
         raise HTTPException(status_code=406,
                             detail=f"{percentage}percent results in less than 1 out of {read_count}reads. ")
-    all_sequence_ids_random_order = db['all_docs'].distinct('sequence_id').oder_by(func)
-    #all_reads_random_order = db.session.query(ModelBinary_result.sequence_id, func.random()).distinct().order_by(func.random())
-    '''# Create the aggregation pipeline
-pipeline = [
-    {"$sample": {"size": num_documents}}
-]
 
-# Execute the aggregation pipeline
-random_documents = list(db['your_collection'].aggregate(pipeline))
-#might be better here??'''
-    random_sequence_ids = all_sequence_ids_random_order[:x]
-    random_binary_results = []
-    for read in random_sequence_ids:
-        random_binary_results.append(await get_read_by_seq_id(read[0]))
-    return random_binary_results
+    # Create the aggregation pipeline
+    pipeline = [
+        {"$group": {"_id": "$sequence_id"}},
+        {"$sample": {"size": num_documents}}
+    ]
+    # Execute the aggregation pipeline
+    distinct_sequence_ids = [doc['_id'] for doc in db['all_docs'].aggregate(pipeline)]
+    random_reads = []
+    for sequence_id in distinct_sequence_ids:
+        random_reads.append(await get_read_by_seq_id(sequence_id))#TODO: this is horribly slow :')
+    return random_reads
+
+@app.get('/get_one_dimension/{dimension_name}/{percentage}',
+         response_description="get one dimension of x percent of all reads",
+         response_model=list, status_code=status.HTTP_200_OK)
+async def get_one_dimension(dimension_name: str, percentage: int):
+    if percentage > 100:
+        raise HTTPException(status_code=406, detail=f"sorry, I can't get you more than 100% of all reads")
+    read_count = await get_read_count()
+    num_documents = int(read_count * percentage / 100)
+    if num_documents < 1:
+        raise HTTPException(status_code=406,
+                            detail=f"{percentage}percent results in less than 1 out of {read_count}reads. ")
+
+
+    # Build the aggregation pipeline
+    pipeline = [
+        {"$match": {dimension_name: {"$exists": True}}},
+        {"$sample": {"size": num_documents}},
+        {"$project": {"_id": 0, "sequence_id": "$sequence_id", dimension_name: f"${dimension_name}"}}
+    ]
+
+    # Execute the aggregation pipeline
+    result = list(db['all_docs'].aggregate(pipeline))
+
+    return result
+
+
+@app.get('/get_two_dimensions/{dimension1_name}/{dimension2_name}/{percentage}',
+         response_description="get two dimensions of x percent of all reads",
+         response_model=list, status_code=status.HTTP_200_OK)
+async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percentage: int):
+    if percentage > 100:
+        raise HTTPException(status_code=406, detail=f"sorry, I can't get you more than 100% of all reads")
+    read_count = await get_read_count()
+    num_documents = int(read_count * percentage / 100)
+    if num_documents < 1:
+        raise HTTPException(status_code=406,
+                            detail=f"{percentage}percent results in less than 1 out of {read_count}reads. ")
+
+    # Build the aggregation pipeline for dimension1_name
+    pipeline1 = [
+        {"$match": {dimension1_name: {"$exists": True}}},
+        {"$sample": {"size": num_documents}},
+        {"$project": {"_id": 0, "sequence_id": "$sequence_id", dimension1_name: f"${dimension1_name}"}}
+    ]
+
+    # Build the aggregation pipeline for dimension2_name
+    pipeline2 = [
+        {"$match": {dimension2_name: {"$exists": True}}},
+        #{"$sample": {"size": num_documents}},
+        {"$project": {"_id": 0, "sequence_id": "$sequence_id", dimension2_name: f"${dimension2_name}"}}
+    ]
+
+    # Execute the aggregation pipelines
+    result1 = list(db['all_docs'].aggregate(pipeline1))
+    result2 = list(db['all_docs'].aggregate(pipeline2))
+
+    # Merge the two results based on 'sequence_id'
+    result = []
+    for doc1 in result1:
+        for doc2 in result2:
+            if doc1['sequence_id'] == doc2['sequence_id']:
+                result.append({**doc1, **doc2})
+
+    return result
+
+
+@app.get('/get_three_dimensions/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}',#TODO there is
+         # no exception if dimension_name doesn't exist
+         response_description="get three dimensions of x percent of all reads",
+         response_model=list, status_code=status.HTTP_200_OK)
+async def get_three_dimensions(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
+    if percentage > 100:
+        raise HTTPException(status_code=406, detail=f"sorry, I can't get you more than 100% of all reads")
+    read_count = await get_read_count()
+    num_documents = int(read_count * percentage / 100)
+    if num_documents < 1:
+        raise HTTPException(status_code=406,
+                            detail=f"{percentage}percent results in less than 1 out of {read_count}reads. ")
+
+    # Build the aggregation pipeline for dimension1_name
+    pipeline1 = [
+        {"$match": {dimension1_name: {"$exists": True}}},
+        {"$sample": {"size": num_documents}},
+        {"$project": {"_id": 0, "sequence_id": "$sequence_id", dimension1_name: f"${dimension1_name}"}}
+    ]
+
+    # Build the aggregation pipeline for dimension2_name
+    pipeline2 = [
+        {"$match": {dimension2_name: {"$exists": True}}},
+        {"$project": {"_id": 0, "sequence_id": "$sequence_id", dimension2_name: f"${dimension2_name}"}}
+    ]
+
+    # Build the aggregation pipeline for dimension3_name
+    pipeline3 = [
+        {"$match": {dimension3_name: {"$exists": True}}},
+        {"$project": {"_id": 0, "sequence_id": "$sequence_id", dimension3_name: f"${dimension3_name}"}}
+    ]
+
+    # Execute the aggregation pipelines
+    result1 = list(db['all_docs'].aggregate(pipeline1))
+    result2 = list(db['all_docs'].aggregate(pipeline2))
+    result3 = list(db['all_docs'].aggregate(pipeline3))
+
+    # Check if each dimension exists in the returned results
+    if not result1:
+        raise HTTPException(status_code=404, detail=f"Dimension '{dimension1_name}' not found in collection.")
+    if not result2:
+        raise HTTPException(status_code=404, detail=f"Dimension '{dimension2_name}' not found in collection.")
+    if not result3:
+        raise HTTPException(status_code=404, detail=f"Dimension '{dimension3_name}' not found in collection.")
+
+    # Merge the three results based on 'sequence_id'
+    result = []
+    for doc1 in result1:
+        for doc2 in result2:
+            for doc3 in result3:
+                if doc1['sequence_id'] == doc2['sequence_id'] == doc3['sequence_id']:
+                    result.append({**doc1, **doc2, **doc3})
+
+    return result
+
 
 @app.post('/document/', response_description="Add new Document", response_model=BaseModel)
 async def create_document(document: BaseModel = Body(...)):
@@ -190,48 +308,78 @@ async def create_documents(documents: List[BaseModel] = Body(...)):
     return JSONResponse(status_code=status.HTTP_201_CREATED,
                         content=f"created {len(new_documents_ids_list)} new documents in eva_ngs collection")
 
-@app.get('/read_by:sequence_id/{sequence_id}', response_description="get read including adjacent binary entries")
+
+@app.get('/read_by_sequence_id/{sequence_id}', response_description="get read_object. an object combined of all "
+                                                                    "document fields, matching a given sequence_id")
 async def get_read_by_seq_id(sequence_id: Union[str]):
-    all_dimensions = reduce(lambda all_keys, rec_keys: all_keys.union(rec_keys),
-                            map(lambda d: set(d.keys()), db['all_docs'].find()), set())
+    # Fetch all relevant documents in a single query
     all_documents_for_id = await get_documents_by_id(sequence_id)
-    read_object ={}
-    for document in all_documents_for_id:
-        for dimension in all_dimensions:
+
+    # Get all dimensions from the fetched documents
+    all_dimensions = set().union(*[set(doc.keys()) for doc in all_documents_for_id])
+
+    # Create the read_object
+    read_object = {}
+    for dimension in all_dimensions:
+        for document in all_documents_for_id:
             value = document.get(dimension)
             if value is not None:
                 read_object[dimension] = value
+                break
+
     return read_object
+
+
 @app.get("/reads/", response_description="list all read objects")
-async def get_all_reads():#TODO: aktuell wird file_id und anderes noch überschrieben mitkraken.txt o.ae noch anders haendeln
-    all_sequence_ids = db["all_docs"].distinct('sequence_id')
-    all_dimensions = reduce(lambda all_keys, rec_keys: all_keys.union(rec_keys),
-                            map(lambda d: set(d.keys()), db['all_docs'].find()), set())
-    all_read_objects = []
+async def get_all_reads():
+    pipeline = [
+        {
+            "$group": {
+                "_id": "$sequence_id",
+                "fields": {
+                    "$addToSet": "$$ROOT"
+                }
+            }
+        },
+        {
+            "$project": {
+                "_id": 0,
+                "sequence_id": "$_id",
+                "fields": {
+                    "$reduce": {
+                        "input": "$fields",
+                        "initialValue": {},
+                        "in": { "$mergeObjects": ["$$value", "$$this"] }
+                    }
+                }
+            }
+        }
+    ]
 
-    for sequence_id in all_sequence_ids:
-        read_object = {}
-        all_documents_for_id = await get_documents_by_id(sequence_id)
+    all_read_objects = list(db['all_docs'].aggregate(pipeline))
 
-        for document in all_documents_for_id:
-            for dimension in all_dimensions:
-                value = document.get(dimension)
-                if value is not None:
-                    read_object[dimension] = value
-
-        all_read_objects.append(read_object)
+    for read_object in all_read_objects:
+        read_object.update(read_object.pop('fields'))
 
     return all_read_objects
 
-@app.get("/documents/", response_description="list all documents", response_model=List[BaseModel])
+'''@app.get("/documents/", response_description="list all documents")#this is not ideal for large collections so 
+                                                                        #pagination has been included
 async def list_all_documents():
-    documents = []
-    for document in db["all_docs"].find():
-        documents.append(document)
-    if documents:
-        return documents
-    raise HTTPException(status_code=status.HTTP_204_NO_CONTENT,
-                        detail=f"looks like there are no documents in the database yet")
+    documents = list(db["all_docs"].find())
+    if not documents:
+        raise HTTPException(status_code=status.HTTP_204_NO_CONTENT,
+                            detail=f"looks like there are no documents in the database yet")
+    return documents'''
+
+@app.get("/documents/", response_description="list all documents")
+async def list_all_documents(page_size: int = Query(10, gt=0), page: int = Query(1, gt=0)):
+    skip = (page - 1) * page_size
+    documents = list(db["all_docs"].find().skip(skip).limit(page_size))
+    if not documents:
+        raise HTTPException(status_code=status.HTTP_204_NO_CONTENT,
+                            detail=f"looks like there are no documents in the database yet")
+    return documents
 
 
 @app.get("/documents/{sequence_id}", response_description="get documents for a specific sequence_id",
