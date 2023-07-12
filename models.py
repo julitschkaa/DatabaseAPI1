@@ -66,7 +66,6 @@ class Kraken2ResultModel(BaseModel):
     sequence_id: str = Field(...)
     classified: str = Field(...)
     taxonomy_id: str = Field(...)
-    sequence_length: int = Field(...)
     lca_mapping_list: list = Field(...)
     file_name: str = Field(...)
 

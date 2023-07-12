@@ -454,7 +454,6 @@ async def upload_kraken(filepath: Union[str]):
             sequence_id=classification["sequence_id"],
             classified=classification["classified"],
             taxonomy_id=classification["taxonomy_id"],
-            sequence_length=classification["sequence_length"],
             lca_mapping_list=classification["lca_mapping_list"],
             file_name=file_name_kraken2
         ))
