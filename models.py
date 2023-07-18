@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, Integer, String, Float
+from sqlalchemy import Column, ForeignKey, Index, Integer, String, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -33,6 +33,9 @@ class BinaryResult(Base):
 
     file_name_and_uuid = relationship('FileNameAndUuid')
     raw_data = relationship('RawData', back_populates='binary_results')
+
+
+sequence_id_index = Index('sequence_id_index', BinaryResult.sequence_id, postgresql_using='hash')
 
 
 class FileNameAndUuid(Base):

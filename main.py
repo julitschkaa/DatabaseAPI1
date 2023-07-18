@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, status, HTTPException
 from fastapi_sqlalchemy import DBSessionMiddleware, db
-from sqlalchemy import func
+from sqlalchemy import func, text
 
 from Datafile_API.fastq_parser import get_fastq_metrics
 from Datafile_API.sam_parser import get_sam_metrics
@@ -136,16 +136,28 @@ async def get_read_count():
          response_model=dict
          )
 async def list_all_possible_dimensions():
-    raw_data_sample_dict = db.session.query(ModelRawData).first().__dict__
-    binary_result_dimensions_names = db.session.query(ModelBinaryResult.name, ModelBinaryResult.type).distinct().all()
-    combined_data_dimensions = {}
-    for key, value in raw_data_sample_dict.items():
-        if str(key) not in ["id", "file_id", "sequence_id"]:#remove unecessary ids from output
-            combined_data_dimensions[str(key)] = re.split("'", str(type(value)))[1] #consider phred_quality is str here!
-    for item in binary_result_dimensions_names:
-        combined_data_dimensions[item[0]] = item[1]
-    if not combined_data_dimensions:
+    # Retrieve a sample record from the RawData table
+    raw_data_sample = db.session.query(ModelRawData).first()
+    if not raw_data_sample:
         raise HTTPException(status_code=404, detail="no dimensions found")
+
+    # Get distinct dimension names from the BinaryResult table
+    binary_result_dimensions = db.session.query(ModelBinaryResult.name, ModelBinaryResult.type).distinct().all()
+
+    # Exclude specific keys
+    excluded_keys = {"id", "file_id", "sequence_id"}
+
+    # Prepare combined_data_dimensions dict,
+    # excluding unnecessary keys and converting the type to a string
+    combined_data_dimensions = {
+        key: str(value.__class__.__name__)
+        for key, value in raw_data_sample.__dict__.items()
+        if key not in excluded_keys
+    }
+
+    # Add the BinaryResult dimensions
+    combined_data_dimensions.update({name: type_ for name, type_ in binary_result_dimensions})
+
     return combined_data_dimensions
 
 
@@ -164,7 +176,31 @@ async def get_random_reads(percentage: int):
     random_sequence_ids = all_sequence_ids_random_order[:number_of_reads_requested]
     random_reads = []
     for row in random_sequence_ids:
-        random_reads.append(await get_entries_by_sequence_id(row.sequence_id))
+        random_reads.append(await get_reads_by_sequence_id(row.sequence_id))
+    return random_reads
+
+
+@app.get('/random_x_percent_TABLESAMPLE_SYSTEM/{percentage}',
+         response_description="get x percent of all reads, randomly selected",
+         status_code=status.HTTP_200_OK,
+         response_model=list)
+async def get_random_reads(percentage: int):
+    if percentage > 100:
+        raise HTTPException(status_code=406, detail=f"Sorry, I cant get you more than 100% of all reads")
+
+    # select a sample of sequence_ids using TABLESAMPLE SYSTEM, consider that
+    # this sample isn't necessarily representative in case of small percentage
+    random_sequence_ids = db.session.execute(
+        text(f'SELECT sequence_id FROM raw_data TABLESAMPLE SYSTEM({percentage})')).fetchall()
+
+    if len(random_sequence_ids) < 1:
+        raise HTTPException(status_code=406,
+                            detail=f"{percentage}% results in less than 1 read. There are not enough reads in the "
+                                   f"database yet. Please add reads or choose higher percentage")
+
+    random_reads = []
+    for row in random_sequence_ids:
+        random_reads.append(await get_reads_by_sequence_id(row.sequence_id))
     return random_reads
 
 
@@ -197,11 +233,11 @@ async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percent
     return return_list
 
 
-@app.get('/get_three_dimensions/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}',
+'''@app.get('/get_three_dimensions/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}',
          response_description="get three dimensions of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
 async def get_three_dimensions(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
-    random_reads = await get_random_reads(percentage)
+    random_reads = await get_random_reads(percentage)#TODO: check dimension is in DB to prevent KeyError
     return_list = []
     for read in random_reads:
         return_list.append({
@@ -210,7 +246,23 @@ async def get_three_dimensions(dimension1_name: str, dimension2_name: str, dimen
             dimension2_name: read[dimension2_name],
             dimension3_name: read[dimension3_name]
         })
-    return return_list
+    return return_list'''
+
+@app.get('/get_three_dimensions/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}',
+         response_description="get three dimensions of x percent of all reads",
+         response_model=list, status_code=status.HTTP_200_OK)
+async def get_three_dimensions(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
+    random_reads = await get_random_reads(percentage)#TODO: check dimension is in DB to prevent KeyError
+    return [
+        {
+            'sequence_id': read['sequence_id'],  # hardcoded because needed for later referencing
+            dimension1_name: read[dimension1_name],
+            dimension2_name: read[dimension2_name],
+            dimension3_name: read[dimension3_name]
+        }
+        for read in random_reads
+    ]
+
 
 
 @app.post('/raw_data/', response_description="write entries to raw data table",
@@ -241,9 +293,9 @@ async def post_binary_result(binary_result: SchemaBinaryResult):
     db.session.commit()
     return db_binary_result
 
-
-@app.get('/read_inlc_binary_results/{sequence_id}', response_description="get read including adjacent binary entries")
-async def get_entries_by_sequence_id(sequence_id: Union[str]):
+'''
+@app.get('/reads_by_seq_id/{sequence_id}', response_description="get read including adjacent binary entries")
+async def get_reads_by_sequence_id(sequence_id: Union[str]):
     joined_data = db.session.query(ModelRawData, ModelBinaryResult).join(ModelRawData.binary_results) \
         .filter(ModelRawData.sequence_id == sequence_id)
 
@@ -262,7 +314,36 @@ async def get_entries_by_sequence_id(sequence_id: Union[str]):
     for entry in joined_data.all():  # now adding the binary_data entries for that read_object
         readObject[entry[1].name] = typecast(entry[1].type, entry[1].value)
 
+    return readObject'''
+
+@app.get('/reads_by_seq_id/{sequence_id}', response_description="get read including adjacent binary entries")
+async def get_reads_by_sequence_id(sequence_id: Union[str]):
+    joined_data = db.session.query(ModelRawData, ModelBinaryResult).join(ModelRawData.binary_results) \
+        .filter(ModelRawData.sequence_id == sequence_id).all()
+
+    if len(joined_data) == 0:
+        return status.HTTP_404_NOT_FOUND
+
+    # Get the first RawData object from the query result
+    first_raw_data = joined_data[0][0]
+
+    # Initialize the read object with raw data values
+    readObject = {
+        'sequence_id': first_raw_data.sequence_id,
+        'sequence': first_raw_data.sequence,
+        'sequence_length': first_raw_data.sequence_length,
+        'min_quality': first_raw_data.min_quality,
+        'max_quality': first_raw_data.max_quality,
+        'average_quality': first_raw_data.average_quality,
+        'phred_quality': typecast("list", first_raw_data.phred_quality) # turn phred quality into list?
+    }
+
+    # Now add the binary data entries for that read object
+    for _, binary_result in joined_data:
+        readObject[binary_result.name] = typecast(binary_result.type, binary_result.value)
+
     return readObject
+
 
 
 @app.get('/raw_data/', response_description="list all reads in raw data table", response_model=List[SchemaRawData])
@@ -353,7 +434,7 @@ async def create_file_name_and_uuid_entries(file_name_and_uuid: SchemaFileNameAn
 
 
 @app.post('/fastq/',
-          status_code=status.HTTP_201_CREATED)  # TODO: better exception handling for read already in db exception
+          status_code=status.HTTP_201_CREATED)
 async def create_fastq_entries(filepath: Union[str]):
     db_file_name_and_uuid = ModelFileNamAndUuid(file_name=filepath,
                                                 file_uuid=uuid4())
