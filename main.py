@@ -126,6 +126,25 @@ async def get_read_count():
     read_count = db.session.query(ModelBinaryResult.sequence_id).distinct().count()
     return read_count
 
+@app.get("/random_x_percent_ids/{percentage}", response_description="get x percent of all sequence_ids, random order",
+         status_code=status.HTTP_200_OK)
+async def get_random_ids(percentage: int):
+    if percentage > 100:
+        raise HTTPException(status_code=406, detail=f"Sorry, I cant get you more than 100% of all sequence_ids")
+    read_count = await get_read_count()
+    number_of_reads_requested = int(read_count*percentage/100)
+    if number_of_reads_requested<1:
+        raise HTTPException(status_code=406, detail=f"{percentage}percent results in less than 1 out of "
+                                                    f"{read_count}reads. there are not enough reads in the database yet."
+                                                    f"please add reads or choose higher percentage")
+    all_sequence_ids_random_order = db.session.query(ModelBinaryResult.sequence_id, func.random())\
+        .distinct().order_by(func.random())
+    random_sequence_ids = all_sequence_ids_random_order[:number_of_reads_requested]
+    random_reads = []
+    for row in random_sequence_ids:
+        random_reads.append(row[0])
+    return random_reads
+
 @app.get('/random_x_percent/{percentage}', response_description="get x percent of all reads, randomly selected",
          status_code=status.HTTP_200_OK)
 async def get_random_reads(percentage: int):
@@ -134,15 +153,19 @@ async def get_random_reads(percentage: int):
     read_count = await get_read_count()
     number_of_reads_requested = int(read_count*percentage/100)
     if number_of_reads_requested<1:
-        raise HTTPException(status_code=406, detail=f"{percentage}percent results in less than 1 out of {read_count}reads. there are not enough reads in the database yet. please add reads or choose higher percentage")
-    all_sequence_ids_random_order = db.session.query(ModelBinaryResult.sequence_id, func.random()).distinct().order_by(func.random())
+        raise HTTPException(status_code=406, detail=f"{percentage}percent results in less than 1 out of "
+                                                    f"{read_count}reads. there are not enough reads in the database yet."
+                                                    f"please add reads or choose higher percentage")
+    all_sequence_ids_random_order = db.session.query(ModelBinaryResult.sequence_id, func.random())\
+        .distinct().order_by(func.random())
     random_sequence_ids = all_sequence_ids_random_order[:number_of_reads_requested]
     random_reads = []
     for row in random_sequence_ids:
-        random_reads.append(await get_entries_by_seq_id(row[0]))
+        random_reads.append(await get_reads_by_sequence_id(row[0]))
     return random_reads
 
-@app.get('/get_one_dimension/{dimension_name}/{percentage}',
+'''
+@app.get('/get_one_dimensionALT/{dimension_name}/{percentage}',
          response_description="get one dimension of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
 async def get_one_dimension(dimension_name: str, percentage: int):
@@ -156,10 +179,10 @@ async def get_one_dimension(dimension_name: str, percentage: int):
     return return_list
 
 
-@app.get('/get_two_dimensions/{dimension1_name}/{dimension2_name}/{percentage}',
+@app.get('/get_two_dimensionsALT/{dimension1_name}/{dimension2_name}/{percentage}',
          response_description="get two dimensions of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
-async def get_two_dimension(dimension1_name: str, dimension2_name: str, percentage: int):
+async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percentage: int):
     random_reads = await get_random_reads(percentage)
     return_list = []
     for read in random_reads:
@@ -171,10 +194,11 @@ async def get_two_dimension(dimension1_name: str, dimension2_name: str, percenta
     return return_list
 
 
-@app.get('/get_three_dimensions/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}',
+
+@app.get('/get_three_dimensions_ALT/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}',
          response_description="get three dimensions of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
-async def get_two_dimension(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
+async def get_three_dimension(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
     random_reads = await get_random_reads(percentage)
     return_list = []
     for read in random_reads:
@@ -185,6 +209,93 @@ async def get_two_dimension(dimension1_name: str, dimension2_name: str, dimensio
             dimension3_name: read[dimension3_name]
         })
     return return_list
+    '''
+
+@app.get('/get_one_dimension/', response_description="get one dimension of x percent of all reads",
+         response_model=list, status_code=status.HTTP_200_OK)
+async def get_one_dimension(dimension_name: str, percentage: int):
+    random_ids = await get_random_ids(percentage)
+
+    # single query to get all binary-results that satisfy the dimension and sequence_id requirements
+    binary_results = db.session.query(ModelBinaryResult).filter(
+        ModelBinaryResult.sequence_id.in_(random_ids),
+        ModelBinaryResult.name == dimension_name
+    ).all()
+
+    # bundling binary results by sequence_id
+    results_by_id = {res.sequence_id: res for res in binary_results}
+
+    # create list of one-dimensional reads via list comprehension
+    return [
+        {
+            'sequence_id': id,
+            dimension_name: typecast(results_by_id[id].type, results_by_id[id].value)
+        }
+        for id in random_ids if id in results_by_id
+    ]
+
+
+
+@app.get('/get_two_dimensions/', response_description="get two dimensions of x percent of all reads",
+         response_model=list, status_code=status.HTTP_200_OK)
+async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percentage: int):
+    random_ids = await get_random_ids(percentage)
+    dimensions = [dimension1_name, dimension2_name]
+
+    # single query to get all binary-results that satisfy the dimension and sequence_id requirements
+    binary_results = db.session.query(ModelBinaryResult).filter(
+        ModelBinaryResult.sequence_id.in_(random_ids),
+        ModelBinaryResult.name.in_(dimensions)
+    ).all()
+
+    # bundeling binary results by sequence_id
+    results_by_id_and_dimension = {
+        (res.sequence_id, res.name): res for res in binary_results
+    }
+
+    # create list of three-dimensional reads via list comprehension
+    return [
+        {
+            'sequence_id': id,
+            dimension1_name: typecast(results_by_id_and_dimension[(id, dimension1_name)].type,
+                                      results_by_id_and_dimension[(id, dimension1_name)].value),
+            dimension2_name: typecast(results_by_id_and_dimension[(id, dimension2_name)].type,
+                                      results_by_id_and_dimension[(id, dimension2_name)].value)
+        }
+        for id in random_ids if id in results_by_id_and_dimension
+    ]
+
+@app.get('/get_three_dimensions/', response_description="get three dimensions of x percent of all reads",
+         response_model=list, status_code=status.HTTP_200_OK)
+async def get_three_dimensions(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
+    random_ids = await get_random_ids(percentage)
+    dimensions = [dimension1_name, dimension2_name, dimension3_name]
+
+    # single query to get all binary-results that satisfy the dimension and sequence_id requirements
+    binary_results = db.session.query(ModelBinaryResult).filter(
+        ModelBinaryResult.sequence_id.in_(random_ids),
+        ModelBinaryResult.name.in_(dimensions)
+    ).all()
+
+    # bundeling binary results by sequence_id
+    results_by_id_and_dimension = {
+        (res.sequence_id, res.name): res for res in binary_results
+    }
+
+    # create list of three-dimensional reads via list comprehension
+    return [
+        {
+            'sequence_id': id,
+            dimension1_name: typecast(results_by_id_and_dimension[(id, dimension1_name)].type,
+                                      results_by_id_and_dimension[(id, dimension1_name)].value),
+            dimension2_name: typecast(results_by_id_and_dimension[(id, dimension2_name)].type,
+                                      results_by_id_and_dimension[(id, dimension2_name)].value),
+            dimension3_name: typecast(results_by_id_and_dimension[(id, dimension3_name)].type,
+                                      results_by_id_and_dimension[(id, dimension3_name)].value)
+        }
+        for id in random_ids
+    ]
+
 
 @app.post('/binary_result/', response_description="write entries to binary_result table"
     , response_model=SchemaBinaryResult, status_code=status.HTTP_201_CREATED)
@@ -193,7 +304,7 @@ async def post_binary_result(binary_result: SchemaBinaryResult):
                                          type=binary_result.type,
                                          name=binary_result.name,
                                          value=binary_result.value,
-                                         file_id=create_file_name_and_uuid_entries)
+                                         file_id=create_file_name_and_uuid_entry)
     db.session.add(db_binary_result)
     db.session.commit()
     return db_binary_result
@@ -234,10 +345,10 @@ async def delete_all_filename_and_uuid():
 
 
 
-@app.get('/binary_results_by_seq_id/',
+@app.get('/reads_by_seq_id/',
          response_description="get read with matching seq_id in binary_results table",
          response_model=dict)
-async def get_entries_by_seq_id(sequence_id: Union[str]):
+async def get_reads_by_sequence_id(sequence_id: Union[str]):
     binary_results = db.session.query(ModelBinaryResult).filter_by(sequence_id=sequence_id).all()
     if not binary_results:
         raise HTTPException(status_code=404, detail="no binary results with matching sequence_id found")
@@ -270,24 +381,23 @@ async def list_file_name_and_uuid():
 
 @app.post('/file_name_and_uuid/', response_description="write entries to file_name_and_id table",
           response_model=SchemaFileNameAndUuid, status_code=status.HTTP_201_CREATED)
-async def create_file_name_and_uuid_entries(db_file_name_and_uuid: SchemaFileNameAndUuid):
+async def create_file_name_and_uuid_entry(db_file_name_and_uuid: SchemaFileNameAndUuid):
     db.session.add(db_file_name_and_uuid)
     db.session.commit()
     return db_file_name_and_uuid
 
 
-@app.post('/fastq/', status_code=status.HTTP_201_CREATED)  # TODO: check if file is already in filename_and_uuid_table
+@app.post('/fastq/', status_code=status.HTTP_201_CREATED)  #file_name in table filename_and_uuid has "unique" constraint
 async def create_fastq_entries(filepath: Union[str]):
     file_name_and_uuid = ModelFileNameAndUuid(file_name=filepath,
                                               binary_of_origin="fastq",
                                               file_uuid=uuid4())
-    db_file_name_and_uuid = await create_file_name_and_uuid_entries(file_name_and_uuid)#not sure if calling await here
-    # is smart
+    db_file_name_and_uuid = await create_file_name_and_uuid_entry(file_name_and_uuid)
     fastq_id = db_file_name_and_uuid.id #get insertion id of file_name object in postgresdb
 
     reads = get_fastq_metrics(filepath)
     for read in reads: # i wanted to refactor this to bulk insert, but multiple session.add() before session.commit()
-        # does exactly that
+        # does exactly that -> https://docs.sqlalchemy.org/en/20/orm/queryguide/dml.html
         for key, value in read.items():
             if key != "sequence_id":
                 db_binary_results = ModelBinaryResult(sequence_id = read["sequence_id"],
