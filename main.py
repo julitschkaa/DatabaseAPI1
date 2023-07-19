@@ -161,7 +161,7 @@ async def list_all_possible_dimensions():
     return combined_data_dimensions
 
 
-@app.get('/random_x_percent/{percentage}', response_description="get x percent of all reads, randomly selected",
+'''@app.get('/random_x_percent/{percentage}', response_description="get x percent of all reads, randomly selected",
          status_code=status.HTTP_200_OK, response_model=list)
 async def get_random_reads(percentage: int):
     if percentage > 100:
@@ -177,7 +177,35 @@ async def get_random_reads(percentage: int):
     random_reads = []
     for row in random_sequence_ids:
         random_reads.append(await get_reads_by_sequence_id(row.sequence_id))
-    return random_reads
+    return random_reads'''
+
+
+@app.get('/random_x_percent/{percentage}',
+         response_description="get x percent of all reads, randomly selected",
+         status_code=status.HTTP_200_OK,
+         response_model=list)
+async def get_random_reads(percentage: int):
+    if percentage > 100:
+        raise HTTPException(status_code=406, detail=f"Sorry, I can't get you more than 100% of all reads")
+
+    # Get the total count of reads needs changing in case reads are supposed to not be unique in table "raw_data"
+    total_count = db.session.query(ModelRawData).count()
+    number_of_reads_requested = int(total_count * percentage / 100)
+
+    if number_of_reads_requested < 1:
+        raise HTTPException(status_code=406, detail=f"{percentage}% results in less than 1 "
+                                                    f"out of {total_count} reads. "
+                                                    f"There are not enough reads in the database yet. "
+                                                    f"Please add reads or choose a higher percentage")
+
+    # Use limit and offset to get only the number_of_reads_requested from DB
+    random_sequence_ids = db.session.query(ModelRawData.sequence_id) \
+        .order_by(func.random()) \
+        .limit(number_of_reads_requested) \
+        .all()
+
+    # Use list comprehension and async calls to get_reads_by_sequence_id
+    return [await get_reads_by_sequence_id(id[0]) for id in random_sequence_ids]
 
 
 @app.get('/random_x_percent_TABLESAMPLE_SYSTEM/{percentage}',
