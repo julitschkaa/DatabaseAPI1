@@ -1,9 +1,8 @@
-import re
-from functools import reduce
-
 import pymongo
 import uvicorn
 import requests
+
+from collections.abc import Mapping
 
 from fastapi import FastAPI, Body, HTTPException, status, Query
 from fastapi.responses import JSONResponse
@@ -18,7 +17,7 @@ from Datafile_API.fastq_parser import get_fastq_metrics
 from Datafile_API.sam_parser import get_sam_metrics
 from Datafile_API.kraken2_script import get_kraken_metrics
 
-from models import PyObjectId, FastqReadModel, Bowtie2ResultModel, Kraken2ResultModel
+from models import PyObjectId, FastqReadModel, Bowtie2ResultModel, Kraken2ResultModel, Document
 
 import os
 from dotenv import load_dotenv
@@ -28,7 +27,7 @@ load_dotenv('.env')
 app = FastAPI()
 client = MongoClient(os.environ["MONGODB_URI"])
 db = client.eva_ngs  # specify database name 'eva_ngs'
-db["all_docs"].create_index([("sequence_id", pymongo.HASHED)])
+db["all_docs"].create_index([("sequence_id", pymongo.HASHED)])#creating single field index on sequence_id field
 
 
 # uncomment to avoid csrftokenError
@@ -123,18 +122,22 @@ async def call_binary_api(endpoint: Union[str], params: dict[str, str]):
     response = requests.get(url=binary_api_url + endpoint, params=params)
     return response
 
+
+def recursively_find_keys_and_types(dict_obj, key_prefix="", dict_of_keys_and_types={}):
+    for key, value in dict_obj.items():
+        if isinstance(value, Mapping):
+            recursively_find_keys_and_types(value, f"{key_prefix}{key}.", dict_of_keys_and_types)
+        else:
+            dict_of_keys_and_types[f"{key_prefix}{key}"] = type(value).__name__
+    return dict_of_keys_and_types
+
 @app.get("/dimensions/", response_description="returns list of all dimensions currently present in database",
          status_code=status.HTTP_200_OK
          )
 async def list_all_possible_dimensions():
-    all_keys = reduce(lambda all_keys, rec_keys: all_keys | set(rec_keys),
-                      map(lambda d: d.keys(), db['all_docs'].find()), set())
     field_types = {}
     for document in db['all_docs'].find():
-        for key in all_keys:
-            if key in document:
-                field_types[key] = re.split("'", str(type(document[key])))[1]
-
+        field_types.update(recursively_find_keys_and_types(document))
     return field_types
 
 
@@ -290,7 +293,7 @@ async def get_three_dimensions(dimension1_name: str, dimension2_name: str, dimen
 
     return result
 
-
+'''this singular document insert is from a previous stage and probably no longer needed'''
 @app.post('/document/', response_description="Add new Document", response_model=BaseModel)
 async def create_document(document: BaseModel = Body(...)):
     document = jsonable_encoder(document)
@@ -299,14 +302,18 @@ async def create_document(document: BaseModel = Body(...)):
     return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_document)
 
 
-@app.post('/documents/', response_description="Add new Documents")
-async def create_documents(documents: List[BaseModel] = Body(...)):
-    jsonied_documents = []  # TODO exceptionhandling needed
-    for document in documents:
-        jsonied_documents.append(jsonable_encoder(document))
-    new_documents_ids_list = db["all_docs"].insert_many(jsonied_documents).inserted_ids
-    return JSONResponse(status_code=status.HTTP_201_CREATED,
-                        content=f"created {len(new_documents_ids_list)} new documents in eva_ngs collection")
+@app.post('/documents/', response_description="Add new Documents", response_model=List[str])
+async def create_documents(documents: List[Union[FastqReadModel, Bowtie2ResultModel, Kraken2ResultModel]] = Body(...)):
+    if not documents:
+        raise HTTPException(status_code=400, detail="No documents provided")
+
+    try:
+        jsonied_documents = [jsonable_encoder(document) for document in documents]
+        result = db["all_docs"].insert_many(jsonied_documents)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="An error occurred while adding the documents.")
+
+    return [str(id) for id in result.inserted_ids]
 
 
 @app.get('/read_by_sequence_id/{sequence_id}', response_description="get read_object. an object combined of all "
@@ -363,14 +370,6 @@ async def get_all_reads():
 
     return all_read_objects
 
-'''@app.get("/documents/", response_description="list all documents")#this is not ideal for large collections so 
-                                                                        #pagination has been included
-async def list_all_documents():
-    documents = list(db["all_docs"].find())
-    if not documents:
-        raise HTTPException(status_code=status.HTTP_204_NO_CONTENT,
-                            detail=f"looks like there are no documents in the database yet")
-    return documents'''
 
 @app.get("/documents/", response_description="list all documents")
 async def list_all_documents(page_size: int = Query(10, gt=0), page: int = Query(1, gt=0)):
@@ -383,9 +382,9 @@ async def list_all_documents(page_size: int = Query(10, gt=0), page: int = Query
 
 
 @app.get("/documents/{sequence_id}", response_description="get documents for a specific sequence_id",
-         response_model=list[BaseModel])  # TODO doesnt find any seuqence ids... whelp
+         response_model=list[Document])
 async def get_documents_by_id(sequence_id: str):
-    documents: list[BaseModel] = []
+    documents: list[Document] = []
     for document in db["all_docs"].find({"sequence_id": sequence_id}):
         documents.append(document)
     if documents:
@@ -403,7 +402,7 @@ async def delete_document_by_id(sequence_id: str):
     raise HTTPException(status_code=404, detail=f"no documents for seq_id {sequence_id} found for deletion")
 
 
-@app.post('/fastq/', response_description="Add all reads from a fastq file to database")
+'''@app.post('/fastq/', response_description="list doc_ids of all reads from a fastq file added to database")
 async def upload_fastq(filepath: Union[str]):
     reads = get_fastq_metrics(filepath)
     collected_fastq_reads = []
@@ -421,43 +420,92 @@ async def upload_fastq(filepath: Union[str]):
                                              file_name=filepath
                                              ))
 
-    return await create_documents(collected_fastq_reads)
+    return await create_documents(collected_fastq_reads)'''
+@app.post('/fastq/', response_description="list doc_ids of all reads from a fastq file added to database")
+async def upload_fastq(filepath: str):
+    reads = get_fastq_metrics(filepath)
+    if not reads:
+        raise HTTPException(status_code=400, detail=f"Could not get any FASTQ metrics from filepath: {filepath}")
+
+    # Generate the documents directly
+    documents = [
+        FastqReadModel(
+            id=PyObjectId(),
+            sequence_id=str(read["sequence_id"]),
+            sequence=str(read["sequence"]),
+            sequence_length=int(read["sequence_length"]),
+            min_quality=int(read["min_quality"]),
+            max_quality=int(read["max_quality"]),
+            average_quality=float(read["average_quality"]),
+            phred_quality=read["phred_quality"],
+            file_name=filepath
+        ) for read in reads
+    ]
+
+    return await create_documents(documents)
 
 
-@app.post('/sam/', response_description="Add all alignments from sam file to database")
-async def upload_sam(filepath: Union[str]):  # TODO noch nicht fertig :')
+
+'''@app.post('/sam/', response_description="list of doc_ids of all alignments from sam file added to database")
+async def upload_sam(filepath: Union[str]):
     sam_entries = get_sam_metrics(filepath)
-    file_name_sam = filepath
+    if not sam_entries:
+        raise HTTPException(status_code=400, detail=f"Could not get any sam_entries from filepath: {filepath}")
     collected_alignments: list = []
 
     for alignment in sam_entries["alignments"]:
         collected_alignments.append(Bowtie2ResultModel(
             sequence_id=alignment["sequence_id"],
-            mapping_tags=alignment["mapping_tags"],
+            mapping_tags=alignment["mapping_tags"], #TODO: consider making this several fields instead of nested dict!!
             position_in_ref=alignment["position_in_ref"],
             mapping_qual=alignment["mapping_qual"],
-            file_name=file_name_sam,
+            file_name=filepath,
             mapping_reference_file=sam_entries["mapping_reference_file"]
         ))
 
-    return await create_documents(collected_alignments)
+    return await create_documents(collected_alignments)'''
+
+@app.post('/sam/', response_description="list of doc_ids of all alignments from sam file added to database")
+async def upload_sam(filepath: str):
+    sam_entries = get_sam_metrics(filepath)
+    if not sam_entries or "alignments" not in sam_entries:
+        raise HTTPException(status_code=400, detail=f"Could not get any SAM metrics from filepath: {filepath}")
+
+    # Generate the documents directly
+    documents = [
+        Bowtie2ResultModel(
+            sequence_id=alignment["sequence_id"],
+            mapping_tags=alignment["mapping_tags"],#TODO: consider making this several fields instead of nested dict!!
+            position_in_ref=alignment["position_in_ref"],
+            mapping_qual=alignment["mapping_qual"],
+            file_name=filepath,
+            mapping_reference_file=sam_entries["mapping_reference_file"]
+        ) for alignment in sam_entries["alignments"]
+    ]
+
+    return await create_documents(documents)
 
 
-@app.post('/kraken2/', response_description="Add all classifications from kraken2 output to database")
-async def upload_kraken(filepath: Union[str]):
+
+@app.post('/kraken2/', response_description="list of doc_ids of all classifications from kraken2 added to database")
+async def upload_kraken(filepath: str):
     kraken_results = get_kraken_metrics(filepath)
-    file_name_kraken2 = filepath
-    collected_classifications: list = []
+    if not kraken_results:
+        raise HTTPException(status_code=400, detail=f"Could not get any kraken metrics from filepath: {filepath}")
 
-    for classification in kraken_results:
-        collected_classifications.append(Kraken2ResultModel(
+    # Generate the kraken2documents
+    documents = [
+        Kraken2ResultModel(
             sequence_id=classification["sequence_id"],
             classified=classification["classified"],
             taxonomy_id=classification["taxonomy_id"],
             lca_mapping_list=classification["lca_mapping_list"],
-            file_name=file_name_kraken2
-        ))
-    return await create_documents(collected_classifications)
+            file_name=filepath
+        ) for classification in kraken_results
+    ]
+
+    return await create_documents(documents)
+
 
 
 @app.delete('/clear_all/')

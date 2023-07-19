@@ -1,8 +1,5 @@
-import uuid
-
-from pydantic import BaseModel, Field
 from bson import ObjectId
-from typing import Optional, List
+from pydantic import BaseModel, Field, ValidationError
 
 """MangoDB stores data as BSON. FastAPI encodes to JSON.
 BSON native ObjectId can't be directly encoded as JSON, 
@@ -25,17 +22,24 @@ class PyObjectId(ObjectId):
         field_schema.update(type="string")
 
 
-class FastqReadModel(BaseModel):
-    id: PyObjectId = Field(default_factory=PyObjectId,
-                           alias="_id")  # aliased because pydantic otherwise assumes private variable
+class Document(BaseModel):
+    id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     sequence_id: str = Field(...)
+    file_name: str = Field(...)
+
+    class Config:
+        allow_population_by_field_name = True
+        arbitrary_types_allowed = True
+        json_encoders = {ObjectId: str}
+
+
+class FastqReadModel(Document):
     sequence: str = Field(...)
     sequence_length: int = Field(...)
     min_quality: int = Field(...)
     max_quality: int = Field(...)
     average_quality: float = Field(...)
     phred_quality: list = Field(...)
-    file_name: str = Field(...)  # could be session id instead?
 
     class Config:
         allow_population_by_field_name = True
@@ -43,31 +47,23 @@ class FastqReadModel(BaseModel):
         json_encoders = {ObjectId: str}
 
 
-class Bowtie2ResultModel(BaseModel):
-    id: PyObjectId = Field(default_factory=PyObjectId,
-                           alias="_id")  # aliased because pydantic otherwise assumes private variable
-    sequence_id: str = Field(...)
-    mapping_tags: dict = Field(...)
+class Bowtie2ResultModel(Document):
+    mapping_tags: dict = Field(...) #TODO: find way to make this flat. nested dict takes longer to search
     position_in_ref: int = Field(...)
     mapping_qual: int = Field(...)
-    file_name: str = Field(...)
-    #I'm not including binary of origin, as its already in model name
+    #I'm not including binary of origin but it might be a good option for later prototypes
     mapping_reference_file: str = Field(...)#this is not included in other db-s but might be necessary?
-    #TODO find out if mapping reference file is something often requeted for visualizaion
+    #TODO find out if mapping reference file is something often requested for visualization
 
     class Config:
         allow_population_by_field_name = True
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
 
-class Kraken2ResultModel(BaseModel):
-    id: PyObjectId = Field(default_factory=PyObjectId,
-                           alias="_id")  # aliased because pydantic otherwise assumes private variable
-    sequence_id: str = Field(...)
+class Kraken2ResultModel(Document):
     classified: str = Field(...)
     taxonomy_id: str = Field(...)
     lca_mapping_list: list = Field(...)
-    file_name: str = Field(...)
 
     class Config:
         allow_population_by_field_name = True
