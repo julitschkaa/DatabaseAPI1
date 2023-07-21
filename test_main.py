@@ -1,7 +1,6 @@
 import os
 from starlette.testclient import TestClient
 
-import sampledimension
 from main import app
 
 client = TestClient(app)
