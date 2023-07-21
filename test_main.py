@@ -54,14 +54,14 @@ def test_get_all_dimensions():
     # Convert the JSON response body to a Python dictionary
     response_body = response.json()
 
-    possible_dimension_keys = ["_id","sequence_id","file_name","sequence","sequence_length","min_quality","max_quality",
-                               "average_quality","phred_quality","AS","XN","XM","XO","XG", "NM","MD","YT",
-                               "position_in_ref","mapping_qual","mapping_reference_file","classified","taxonomy_id",
+    possible_dimension_keys = ["sequence", "sequence_length", "min_quality", "max_quality",  "average_quality",
+                               "phred_quality", "AS", "XN", "XM", "XO", "XG", "NM", "MD", "YT",
+                               "position_in_ref", "mapping_qual", "classified", "taxonomy_id",
                                "lca_mapping_list"]
-    #Now you can access the response body as a normal Python dictionary
+    # Now you can access the response body as a normal Python dictionary
     for key, value in response_body.items():
         assert key in possible_dimension_keys
-    assert len(response_body.keys()) == 19
+    assert len(response_body.keys()) == len(possible_dimension_keys)
 
 def test_get_randoom_x_percent():
     percentage = 50
