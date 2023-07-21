@@ -14,6 +14,6 @@ def get_fastq_metrics(filename):
                                   / len(record.letter_annotations["phred_quality"])
         read["phred_quality"] = record.letter_annotations["phred_quality"]
         reads.append(read)
-        #if(len(reads)==20): #input limit for test purpose
-            #break
+        if(len(reads)==20): #input limit for test purpose
+            break
     return reads

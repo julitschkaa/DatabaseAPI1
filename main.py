@@ -161,7 +161,7 @@ async def get_random_reads(percentage: int):
     random_sequence_ids = all_sequence_ids_random_order[:number_of_reads_requested]
     random_reads = []
     for row in random_sequence_ids:
-        random_reads.append(await get_reads_by_sequence_id(row[0]))
+        random_reads.append(await get_read_by_sequence_id(row[0]))
     return random_reads
 
 '''
@@ -248,6 +248,7 @@ async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percent
         ModelBinaryResult.name.in_(dimensions)
     ).all()
 
+
     # bundeling binary results by sequence_id
     results_by_id_and_dimension = {
         (res.sequence_id, res.name): res for res in binary_results
@@ -262,7 +263,7 @@ async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percent
             dimension2_name: typecast(results_by_id_and_dimension[(id, dimension2_name)].type,
                                       results_by_id_and_dimension[(id, dimension2_name)].value)
         }
-        for id in random_ids if id in results_by_id_and_dimension
+        for id in random_ids #if id in results_by_id_and_dimension
     ]
 
 @app.get('/get_three_dimensions/', response_description="get three dimensions of x percent of all reads",
@@ -345,10 +346,26 @@ async def delete_all_filename_and_uuid():
 
 
 
-@app.get('/reads_by_seq_id/',
+'''@app.get('/read_by_seq_id/',
          response_description="get read with matching seq_id in binary_results table",
          response_model=dict)
 async def get_reads_by_sequence_id(sequence_id: Union[str]):
+    binary_results = db.session.query(ModelBinaryResult).filter_by(sequence_id=sequence_id).all()
+    if not binary_results:
+        raise HTTPException(status_code=404, detail="no binary results with matching sequence_id found")
+    readObject = {
+        'sequence_id':sequence_id
+    }
+
+    for entry in binary_results:
+        readObject[entry.name] = typecast(entry.type, entry.value)
+
+    return readObject'''
+
+@app.get('/read_by_sequence_id/',
+         response_description="get read with matching seq_id in binary_results table",
+         response_model=dict)
+async def get_read_by_sequence_id(sequence_id: Union[str]):
     binary_results = db.session.query(ModelBinaryResult).filter_by(sequence_id=sequence_id).all()
     if not binary_results:
         raise HTTPException(status_code=404, detail="no binary results with matching sequence_id found")
