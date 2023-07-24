@@ -1,48 +1,48 @@
-Execution Times upload_fastq , 10 executions
-min_time: 0.03472610199969495   max_time: 2.3140707970014773      average_time: 0.26309413340059107 seconds
+Execution Times upload_fastq , 100 executions
+min_time: 0.03019184699996913   max_time: 0.10920582900007503      average_time: 0.039497646949992034 seconds
 
-Execution Times upload_sam , 10 executions
-min_time: 0.009108530000958126   max_time: 0.036854562000371516      average_time: 0.018000757902336774 seconds
+Execution Times upload_sam , 100 executions
+min_time: 0.00704169899995577   max_time: 0.027624252999885357      average_time: 0.009142244910003683 seconds
 
-Execution Times upload_kraken2 , 10 executions
-min_time: 0.3227048020053189   max_time: 0.3724051850003889      average_time: 0.33603054150007666 seconds
+Execution Times upload_kraken2 , 100 executions
+min_time: 0.31651938899995   max_time: 0.3939440740000464      average_time: 0.32781485009999867 seconds
 
-Execution Times upload_all , 10 executions
-min_time: 0.37338114099839004   max_time: 0.4116182169964304      average_time: 0.38567220049953904 seconds
+Execution Times upload_all , 100 executions
+min_time: 0.35585859699995126   max_time: 0.42053312100006224      average_time: 0.36925770464999913 seconds
 
-Execution Times get_dimensions , 10 executions
-min_time: 0.012200062003103085   max_time: 0.060614686997723766      average_time: 0.017751516999851447 seconds
+Execution Times get_dimensions , 100 executions
+min_time: 0.09046312899999975   max_time: 0.16077259500002583      average_time: 0.10308504991000518 seconds
 
-Execution Times get_read_by_id , 10 executions
-min_time: 0.004356004996225238   max_time: 0.004884668000158854      average_time: 0.004523064400564181 seconds
+Execution Times get_read_by_id , 100 executions
+min_time: 0.010027472000047055   max_time: 0.015496770000027027      average_time: 0.011882478930001526 seconds
 
-Execution Times get_random_80_percent , 10 executions
-min_time: 0.03318596099416027   max_time: 0.04038656799821183      average_time: 0.035781825599406146 seconds
+Execution Times get_random_80_percent , 100 executions
+min_time: 0.13309005399992202   max_time: 0.2493622540000615      average_time: 0.14562162597001133 seconds
 
-Execution Times get_random_100_percent , 10 executions
-min_time: 0.04004599600011716   max_time: 0.04493717499281047      average_time: 0.0425896887005365 seconds
+Execution Times get_random_100_percent , 100 executions
+min_time: 0.16446349199986798   max_time: 0.24049905699985175      average_time: 0.17418578855000078 seconds
 
-Execution Times get_one_nested_dimension_80 , 10 executions
-min_time: 0.005343264994735364   max_time: 0.005793581003672443      average_time: 0.005492394699831493 seconds
+Execution Times get_one_nested_dimension_80 , 100 executions
+min_time: 0.014021857999978238   max_time: 0.03967179899996154      average_time: 0.018345109749996025 seconds
 
-Execution Times get_one_nested_dimension_100 , 10 executions
-min_time: 0.005287617997964844   max_time: 0.005716997999115847      average_time: 0.005544648699287791 seconds
+Execution Times get_one_nested_dimension_100 , 100 executions
+min_time: 0.014420064999967508   max_time: 0.02694085799998902      average_time: 0.016738698230005865 seconds
 
-Execution Times get_one_dimension_80 , 10 executions
-min_time: 0.005077426998468582   max_time: 0.0053005619993200526      average_time: 0.0051855322984920346 seconds
+Execution Times get_one_dimension_80 , 100 executions
+min_time: 0.013975348999792914   max_time: 0.02342714199994589      average_time: 0.015599197140015803 seconds
 
-Execution Times get_one_dimension_100 , 10 executions
-min_time: 0.005179357998713385   max_time: 0.00573651900049299      average_time: 0.005323339397727977 seconds
+Execution Times get_one_dimension_100 , 100 executions
+min_time: 0.014046562999965317   max_time: 0.023581748999959018      average_time: 0.015600799079988974 seconds
 
-Execution Times get_two_dimensions_80 , 10 executions
-min_time: 0.010730912996223196   max_time: 0.014254121997510083      average_time: 0.011346843999490375 seconds
+Execution Times get_two_dimensions_80 , 100 executions
+min_time: 0.06428830100003324   max_time: 0.10271711299992603      average_time: 0.06919493545999103 seconds
 
-Execution Times get_two_dimensions_100 , 10 executions
-min_time: 0.011856440003612079   max_time: 0.012484266997489613      average_time: 0.012182046000089031 seconds
+Execution Times get_two_dimensions_100 , 100 executions
+min_time: 0.0731607749999057   max_time: 0.16270206800004416      average_time: 0.08405884685999582 seconds
 
-Execution Times get_three_dimensions_80 , 10 executions
-min_time: 0.10880164799891645   max_time: 0.11811858000146458      average_time: 0.11115918600044097 seconds
+Execution Times get_three_dimensions_80 , 100 executions
+min_time: 10.031927247000112   max_time: 13.904201041000306      average_time: 10.500802891469984 seconds
 
-Execution Times get_three_dimensions_100 , 10 executions
-min_time: 0.13357909199839924   max_time: 0.14290225199511042      average_time: 0.1368709616996057 seconds
+Execution Times get_three_dimensions_100 , 100 executions
+min_time: 12.67271173500012   max_time: 18.352296793000278      average_time: 13.356646159970037 seconds
 

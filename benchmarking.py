@@ -9,6 +9,8 @@ load_dotenv()#making .env variables availabe to os.getenv
 
 #naming file for benchmarking results
 benchmark_file = open('MongoDB_benchmarking.txt', 'w')
+#defineing number of runs to be evaluated
+num_of_runs = 100
 
 #getting environment variables
 fastq_file = os.getenv('PATH_TO_FASTQ')
@@ -146,36 +148,35 @@ def get_three_dimensions_100():
     assert response.status_code == 200, f"get two dimensions 100 failed with status {response.status_code}"
 
 
-def benchmark_and_write_to_file(function, num_of_runs:int):
+def benchmark_and_write_to_file(function):
     wrapped = wrapper(function)
     times = timeit.repeat(wrapped, repeat=num_of_runs, number=1)
 
     benchmark_file.write(f"Execution Times {function.__name__} , {num_of_runs} executions\n")
-    benchmark_file.write(f"min_time: {min(times)}   max_time: {max(times)}      "
-                         f"average_time: {sum(times) / len(times)} seconds\n")
+    benchmark_file.write(f"min_time: {min(times)} seconds\n")
     benchmark_file.write(f"\n")
 
 
-benchmark_and_write_to_file(upload_fastq, 10)
+benchmark_and_write_to_file(upload_fastq)
 clean_db()
 
-benchmark_and_write_to_file(upload_sam, 10)
+benchmark_and_write_to_file(upload_sam)
 clean_db()
 
-benchmark_and_write_to_file(upload_kraken2, 10)
+benchmark_and_write_to_file(upload_kraken2)
 clean_db()
 
-benchmark_and_write_to_file(upload_all,10)
+benchmark_and_write_to_file(upload_all,num_of_runs)
 
-benchmark_and_write_to_file(get_dimensions,10)
-benchmark_and_write_to_file(get_read_by_id,10)
-benchmark_and_write_to_file(get_random_80_percent,10)
-benchmark_and_write_to_file(get_random_100_percent,10)
-benchmark_and_write_to_file(get_one_nested_dimension_80,10)
-benchmark_and_write_to_file(get_one_nested_dimension_100,10)
-benchmark_and_write_to_file(get_one_dimension_80,10)
-benchmark_and_write_to_file(get_one_dimension_100,10)
-benchmark_and_write_to_file(get_two_dimensions_80,10)
-benchmark_and_write_to_file(get_two_dimensions_100,10)
-benchmark_and_write_to_file(get_three_dimensions_80,10)
-benchmark_and_write_to_file(get_three_dimensions_100,10)
+benchmark_and_write_to_file(get_dimensions,num_of_runs)
+benchmark_and_write_to_file(get_read_by_id)
+benchmark_and_write_to_file(get_random_80_percent)
+benchmark_and_write_to_file(get_random_100_percent)
+benchmark_and_write_to_file(get_one_nested_dimension_80)
+benchmark_and_write_to_file(get_one_nested_dimension_100)
+benchmark_and_write_to_file(get_one_dimension_80)
+benchmark_and_write_to_file(get_one_dimension_100)
+benchmark_and_write_to_file(get_two_dimensions_80)
+benchmark_and_write_to_file(get_two_dimensions_100)
+benchmark_and_write_to_file(get_three_dimensions_80)
+benchmark_and_write_to_file(get_three_dimensions_100)
