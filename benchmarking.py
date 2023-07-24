@@ -1,3 +1,4 @@
+import gc
 import os
 
 from dotenv import load_dotenv
@@ -8,9 +9,9 @@ import timeit
 load_dotenv()#making .env variables availabe to os.getenv
 
 #naming file for benchmarking results
-benchmark_file = open('MongoDB_benchmarking.txt', 'w')
+benchmark_file = open('TRIALMongoDB_2000reads_10runs_benchmarking.txt', 'w')
 #defineing number of runs to be evaluated
-num_of_runs = 100
+num_of_runs = 10
 
 #getting environment variables
 fastq_file = os.getenv('PATH_TO_FASTQ')
@@ -166,9 +167,9 @@ clean_db()
 benchmark_and_write_to_file(upload_kraken2)
 clean_db()
 
-benchmark_and_write_to_file(upload_all,num_of_runs)
+benchmark_and_write_to_file(upload_all)
 
-benchmark_and_write_to_file(get_dimensions,num_of_runs)
+benchmark_and_write_to_file(get_dimensions)
 benchmark_and_write_to_file(get_read_by_id)
 benchmark_and_write_to_file(get_random_80_percent)
 benchmark_and_write_to_file(get_random_100_percent)
