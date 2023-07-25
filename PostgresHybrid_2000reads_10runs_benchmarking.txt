@@ -1,0 +1,9 @@
+Execution Times upload_fastq , 10 executions
+min_time: 12.935083700001996 seconds
+
+Execution Times upload_sam , 10 executions
+min_time: 128.4137679350024 seconds
+
+Execution Times upload_kraken2 , 10 executions
+min_time: 38.68803147599829 seconds
+

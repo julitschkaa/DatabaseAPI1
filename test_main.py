@@ -20,7 +20,7 @@ def test_delete_all_raw_data():
     assert response.status_code in [200,404]
 
 def test_delete_all_filename_and_uuid():
-    response = client.delete("/delete_binary_results/")
+    response = client.delete("/delete_filename_and_uuid/")
     assert response.status_code in [200,404]
     read_count_response = client.get("/read_count/")
     read_count = read_count_response.json()

@@ -1,0 +1,45 @@
+Execution Times upload_fastq , 10 executions
+min_time: 0.1259325409992016 seconds
+
+Execution Times upload_sam , 10 executions
+min_time: 1.2598238079990551 seconds
+
+Execution Times upload_kraken2 , 10 executions
+min_time: 0.6521216600012849 seconds
+
+Execution Times upload_all , 10 executions
+min_time: 2.0232157290010946 seconds
+
+Execution Times get_dimensions , 10 executions
+min_time: 0.004906392998236697 seconds
+
+Execution Times get_read_by_id , 10 executions
+min_time: 0.0059144879996893 seconds
+
+Execution Times get_random_80_percent , 10 executions
+min_time: 0.042899387000943534 seconds
+
+Execution Times get_random_80_percentTABLESAMPLE , 10 executions
+min_time: 0.035338644000148633 seconds
+
+Execution Times get_random_100_percent , 10 executions
+min_time: 0.051564422999945236 seconds
+
+Execution Times get_one_dimension_80 , 10 executions
+min_time: 0.047859717000392266 seconds
+
+Execution Times get_one_dimension_100 , 10 executions
+min_time: 0.04778817199985497 seconds
+
+Execution Times get_two_dimensions_80 , 10 executions
+min_time: 0.020553760998154758 seconds
+
+Execution Times get_two_dimensions_100 , 10 executions
+min_time: 0.0469820879989129 seconds
+
+Execution Times get_three_dimensions_80 , 10 executions
+min_time: 0.01963632800107007 seconds
+
+Execution Times get_three_dimensions_100 , 10 executions
+min_time: 0.04745154299962451 seconds
+
