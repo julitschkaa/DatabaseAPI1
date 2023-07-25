@@ -9,8 +9,8 @@ import timeit
 load_dotenv()#making .env variables availabe to os.getenv
 
 #naming file for benchmarking results
-benchmark_file = open('TRIALMongoDB_2000reads_10runs_benchmarking.txt', 'w')
-#defineing number of runs to be evaluated
+benchmark_file = open('MongoDB_20reads_10runs_benchmarking.txt', 'w')
+#defining number of runs to be evaluated
 num_of_runs = 10
 
 #getting environment variables
@@ -59,7 +59,7 @@ def wrapper(func, *args, **kwargs):
 # delete all_docs table from database
 def clean_db():
     response = requests.delete(delete_all_url)
-    assert response.status_code == 200, f"delete failed with status {response.status_code}"
+    assert response.status_code in [200, 304], f"delete failed with status {response.status_code}"
 
 
 #    post fastq file, verify http200, delete_all, verify http200
@@ -149,26 +149,32 @@ def get_three_dimensions_100():
     assert response.status_code == 200, f"get two dimensions 100 failed with status {response.status_code}"
 
 
-def benchmark_and_write_to_file(function):
+def benchmark_and_write_to_file(function, clean_up=False):
+    def setup():
+        if clean_up:
+            clean_db()
+
     wrapped = wrapper(function)
-    times = timeit.repeat(wrapped, repeat=num_of_runs, number=1)
+    times = timeit.repeat(wrapped, setup=setup, repeat=num_of_runs, number=1)
 
     benchmark_file.write(f"Execution Times {function.__name__} , {num_of_runs} executions\n")
     benchmark_file.write(f"min_time: {min(times)} seconds\n")
     benchmark_file.write(f"\n")
 
 
-benchmark_and_write_to_file(upload_fastq)
+benchmark_and_write_to_file(upload_fastq, True)
 clean_db()
 
-benchmark_and_write_to_file(upload_sam)
+benchmark_and_write_to_file(upload_sam, True)
 clean_db()
 
-benchmark_and_write_to_file(upload_kraken2)
+benchmark_and_write_to_file(upload_kraken2, True)
 clean_db()
 
-benchmark_and_write_to_file(upload_all)
+benchmark_and_write_to_file(upload_all, True)
+clean_db()
 
+upload_all()
 benchmark_and_write_to_file(get_dimensions)
 benchmark_and_write_to_file(get_read_by_id)
 benchmark_and_write_to_file(get_random_80_percent)

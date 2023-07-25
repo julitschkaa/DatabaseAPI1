@@ -16,7 +16,7 @@ def get_sam_metrics(filename):
         alignment["position_in_ref"] = x.pos
         alignment["mapping_qual"] = x.mapq
         alignments.append(alignment)
-        if (len(alignments) == 2000):
+        if (len(alignments) == 20):
             break
 
     binary_results = {}

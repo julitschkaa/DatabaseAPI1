@@ -1,48 +1,48 @@
 Execution Times upload_fastq , 10 executions
-min_time: 0.3367400720017031 seconds
+min_time: 2.7338330919992586 seconds
 
 Execution Times upload_sam , 10 executions
-min_time: 0.07508502199925715 seconds
+min_time: 0.3960985300000175 seconds
 
 Execution Times upload_kraken2 , 10 executions
-min_time: 0.38278786099908757 seconds
+min_time: 0.6969037740000203 seconds
 
 Execution Times upload_all , 10 executions
-min_time: 0.7106914979995054 seconds
+min_time: 3.786485337999693 seconds
 
 Execution Times get_dimensions , 10 executions
-min_time: 0.012245292997249635 seconds
+min_time: 0.10181304899924726 seconds
 
 Execution Times get_read_by_id , 10 executions
-min_time: 0.004397816999698989 seconds
+min_time: 0.007691516000704723 seconds
 
 Execution Times get_random_80_percent , 10 executions
-min_time: 0.27262717700068606 seconds
+min_time: 8.562651947000631 seconds
 
 Execution Times get_random_100_percent , 10 executions
-min_time: 0.32409716899928753 seconds
+min_time: 10.646798585001306 seconds
 
 Execution Times get_one_nested_dimension_80 , 10 executions
-min_time: 0.013324933002877515 seconds
+min_time: 0.07010892499965848 seconds
 
 Execution Times get_one_nested_dimension_100 , 10 executions
-min_time: 0.015086848998180358 seconds
+min_time: 0.08222066199959954 seconds
 
 Execution Times get_one_dimension_80 , 10 executions
-min_time: 0.009722818002046552 seconds
+min_time: 0.056818635001036455 seconds
 
 Execution Times get_one_dimension_100 , 10 executions
-min_time: 0.009561744998791255 seconds
+min_time: 0.06211625799915055 seconds
 
 Execution Times get_two_dimensions_80 , 10 executions
-min_time: 0.014365394999913406 seconds
+min_time: 0.38108894499964663 seconds
 
 Execution Times get_two_dimensions_100 , 10 executions
-min_time: 0.016208899000048405 seconds
+min_time: 0.45900913500008755 seconds
 
 Execution Times get_three_dimensions_80 , 10 executions
-min_time: 0.554304602999764 seconds
+min_time: 549.4035875009995 seconds
 
 Execution Times get_three_dimensions_100 , 10 executions
-min_time: 0.6911371950009197 seconds
+min_time: 660.9397298299991 seconds
 
