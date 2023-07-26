@@ -8,7 +8,7 @@ import timeit
 load_dotenv()#making .env variables availabe to os.getenv
 
 #naming file for benchmarking results
-benchmark_file = open('PostgresHybrid_2000reads_10runs_benchmarking.txt', 'w')
+benchmark_file = open('PostgresHybrid_2000reads_10runs_3ter_teil_benchmarking.txt', 'w')
 #defining number of runs to be evaluated
 num_of_runs = 10
 
@@ -163,7 +163,7 @@ def benchmark_and_write_to_file(function, clean_up=False):
     benchmark_file.write(f"\n")
 
 
-benchmark_and_write_to_file(upload_fastq, True)
+'''benchmark_and_write_to_file(upload_fastq, True)
 clean_db()
 
 benchmark_and_write_to_file(upload_sam, True)
@@ -175,7 +175,7 @@ clean_db()
 benchmark_and_write_to_file(upload_all, True)
 clean_db()
 
-upload_all()
+upload_all()'''
 benchmark_and_write_to_file(get_dimensions)
 benchmark_and_write_to_file(get_read_by_id)
 benchmark_and_write_to_file(get_random_80_percent)

@@ -321,8 +321,8 @@ async def post_binary_result(binary_result: SchemaBinaryResult):
     db.session.commit()
     return db_binary_result
 
-'''
-@app.get('/reads_by_seq_id/{sequence_id}', response_description="get read including adjacent binary entries")
+
+'''@app.get('/reads_by_seq_id/{sequence_id}', response_description="get read including adjacent binary entries")
 async def get_reads_by_sequence_id(sequence_id: Union[str]):
     joined_data = db.session.query(ModelRawData, ModelBinaryResult).join(ModelRawData.binary_results) \
         .filter(ModelRawData.sequence_id == sequence_id)

@@ -1,0 +1,18 @@
+Execution Times upload_all , 10 executions
+min_time: 187.816913653 seconds
+
+Execution Times get_dimensions , 10 executions
+min_time: 0.014922376999948028 seconds
+
+Execution Times get_read_by_id , 10 executions
+min_time: 0.010614841999995406 seconds
+
+Execution Times get_random_80_percent , 10 executions
+min_time: 8.823851537999872 seconds
+
+Execution Times get_random_80_percentTABLESAMPLE , 10 executions
+min_time: 8.623568091999914 seconds
+
+Execution Times get_random_100_percent , 10 executions
+min_time: 11.008342987000105 seconds
+
