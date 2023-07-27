@@ -9,7 +9,7 @@ import timeit
 load_dotenv()#making .env variables availabe to os.getenv
 
 #naming file for benchmarking results
-benchmark_file = open('MongoDB_20reads_10runs_benchmarking.txt', 'w')
+benchmark_file = open('TrialMongoDB_2000reads_10runs_benchmarking.txt', 'w')
 #defining number of runs to be evaluated
 num_of_runs = 10
 
