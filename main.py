@@ -164,52 +164,6 @@ async def get_random_reads(percentage: int):
         random_reads.append(await get_read_by_sequence_id(row[0]))
     return random_reads
 
-'''
-@app.get('/get_one_dimensionALT/{dimension_name}/{percentage}',
-         response_description="get one dimension of x percent of all reads",
-         response_model=list, status_code=status.HTTP_200_OK)
-async def get_one_dimension(dimension_name: str, percentage: int):
-    random_reads = await get_random_reads(percentage)
-    return_list = []
-    for read in random_reads:
-        return_list.append({
-            'sequence_id': read['sequence_id'],  # hardcoded because needed for later referencing
-            dimension_name: read[dimension_name]
-        })
-    return return_list
-
-
-@app.get('/get_two_dimensionsALT/{dimension1_name}/{dimension2_name}/{percentage}',
-         response_description="get two dimensions of x percent of all reads",
-         response_model=list, status_code=status.HTTP_200_OK)
-async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percentage: int):
-    random_reads = await get_random_reads(percentage)
-    return_list = []
-    for read in random_reads:
-        return_list.append({
-            'sequence_id': read['sequence_id'],  # hardcoded because needed for later referencing
-            dimension1_name: read[dimension1_name],
-            dimension2_name: read[dimension2_name]
-        })
-    return return_list
-
-
-
-@app.get('/get_three_dimensions_ALT/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}',
-         response_description="get three dimensions of x percent of all reads",
-         response_model=list, status_code=status.HTTP_200_OK)
-async def get_three_dimension(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
-    random_reads = await get_random_reads(percentage)
-    return_list = []
-    for read in random_reads:
-        return_list.append({
-            'sequence_id': read['sequence_id'],  # hardcoded because needed for later referencing
-            dimension1_name: read[dimension1_name],
-            dimension2_name: read[dimension2_name],
-            dimension3_name: read[dimension3_name]
-        })
-    return return_list
-    '''
 
 @app.get('/get_one_dimension/', response_description="get one dimension of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
@@ -344,23 +298,6 @@ async def delete_all_filename_and_uuid():
     db.session.commit()
     return status.HTTP_200_OK
 
-
-
-'''@app.get('/read_by_seq_id/',
-         response_description="get read with matching seq_id in binary_results table",
-         response_model=dict)
-async def get_reads_by_sequence_id(sequence_id: Union[str]):
-    binary_results = db.session.query(ModelBinaryResult).filter_by(sequence_id=sequence_id).all()
-    if not binary_results:
-        raise HTTPException(status_code=404, detail="no binary results with matching sequence_id found")
-    readObject = {
-        'sequence_id':sequence_id
-    }
-
-    for entry in binary_results:
-        readObject[entry.name] = typecast(entry.type, entry.value)
-
-    return readObject'''
 
 @app.get('/read_by_sequence_id/',
          response_description="get read with matching seq_id in binary_results table",
