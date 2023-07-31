@@ -402,25 +402,6 @@ async def delete_document_by_id(sequence_id: str):
     raise HTTPException(status_code=404, detail=f"no documents for seq_id {sequence_id} found for deletion")
 
 
-'''@app.post('/fastq/', response_description="list doc_ids of all reads from a fastq file added to database")
-async def upload_fastq(filepath: Union[str]):
-    reads = get_fastq_metrics(filepath)
-    collected_fastq_reads = []
-
-    for read in reads:
-        # TODO check if sequence ID exists already
-        collected_fastq_reads.append(FastqReadModel(id=PyObjectId(),
-                                             sequence_id=str(read["sequence_id"]),
-                                             sequence=str(read["sequence"]),
-                                             sequence_length=int(read["sequence_length"]),
-                                             min_quality=int(read["min_quality"]),
-                                             max_quality=int(read["max_quality"]),
-                                             average_quality=float(read["average_quality"]),
-                                             phred_quality=read["phred_quality"],
-                                             file_name=filepath
-                                             ))
-
-    return await create_documents(collected_fastq_reads)'''
 @app.post('/fastq/', response_description="list doc_ids of all reads from a fastq file added to database")
 async def upload_fastq(filepath: str):
     reads = get_fastq_metrics(filepath)
@@ -445,26 +426,6 @@ async def upload_fastq(filepath: str):
     return await create_documents(documents)
 
 
-
-'''@app.post('/sam/', response_description="list of doc_ids of all alignments from sam file added to database")
-async def upload_sam(filepath: Union[str]):
-    sam_entries = get_sam_metrics(filepath)
-    if not sam_entries:
-        raise HTTPException(status_code=400, detail=f"Could not get any sam_entries from filepath: {filepath}")
-    collected_alignments: list = []
-
-    for alignment in sam_entries["alignments"]:
-        collected_alignments.append(Bowtie2ResultModel(
-            sequence_id=alignment["sequence_id"],
-            mapping_tags=alignment["mapping_tags"], #TODO: consider making this several fields instead of nested dict!!
-            position_in_ref=alignment["position_in_ref"],
-            mapping_qual=alignment["mapping_qual"],
-            file_name=filepath,
-            mapping_reference_file=sam_entries["mapping_reference_file"]
-        ))
-
-    return await create_documents(collected_alignments)'''
-
 @app.post('/sam/', response_description="list of doc_ids of all alignments from sam file added to database")
 async def upload_sam(filepath: str):
     sam_entries = get_sam_metrics(filepath)
@@ -486,7 +447,6 @@ async def upload_sam(filepath: str):
     return await create_documents(documents)
 
 
-
 @app.post('/kraken2/', response_description="list of doc_ids of all classifications from kraken2 added to database")
 async def upload_kraken(filepath: str):
     kraken_results = get_kraken_metrics(filepath)
@@ -505,7 +465,6 @@ async def upload_kraken(filepath: str):
     ]
 
     return await create_documents(documents)
-
 
 
 @app.delete('/clear_all/')

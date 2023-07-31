@@ -1,11 +1,15 @@
 # DatabaseAPI1
-Python API that reads .fastq reads , bowtie2 aligments or kraken2 classifiactions into a Mongo-DB flatfile database. The database accepts all different documents into one single collection. however, for every new data/file format a new model, schema and endpoint has to be implemented.
+## MangoDB Prototyp1
+Python API that reads .fastq reads , bowtie2 aligments or kraken2 classifiactions as seperate documents into Mongo-DB. 
+The database accepts all different documents into one single collection. however, 
+for every new data/file format a new model, schema and endpoint has to be implemented.
 Current ERD: 
-![one single table: all different kinds of documtens inserted](images/actualflatfilemongodb.png "flatfile model for MongoDB")
+![one single table: all different kinds of documtens inserted](images/actualflatfilemongodb.png "data model for MongoDB")
 
 to start:  
-1. start mongoDB
-2. ```uvicorn main:app --reload --port 8080```
+1. ``pip install -r requirements.txt```
+2. start your local MongoDB
+3. ```uvicorn main:app --reload --port 8080```
 ![screenshot of flatfiledb endpoints](images/actual_flatfile_endpoints_screenshot.png "Endpoints of flatfile db API")
 ![screenshot of get all dimensions endpoint](images/actual_flatfile_dimensions_endpoint_screenshot.png "screenshot of get all dimensions endpoint")
 ![screenshot of get one_dimension endpoint](images/actual_flatfile_get_one_dimension_endpoint_screenshot.png "screenshot of get one dimension endpoint")
