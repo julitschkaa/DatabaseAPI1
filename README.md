@@ -1,5 +1,5 @@
 # DatabaseAPI1
-Postgres2-Prototyp
+##Postgres2-Prototyp
 Python API that reads .fastq and .sam files into three separate tables in a PostgreSQL DB.
 Current ERD: 
 ![three entity RD for postgres set up. seperate tables for data from fastq reads, sam files as well as kraken output 
