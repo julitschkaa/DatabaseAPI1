@@ -161,25 +161,6 @@ async def list_all_possible_dimensions():
     return combined_data_dimensions
 
 
-'''@app.get('/random_x_percent/{percentage}', response_description="get x percent of all reads, randomly selected",
-         status_code=status.HTTP_200_OK, response_model=list)
-async def get_random_reads(percentage: int):
-    if percentage > 100:
-        raise HTTPException(status_code=406, detail=f"Sorry, I cant get you more than 100% of all reads")
-    all_sequence_ids_random_order = db.session.query(ModelRawData.sequence_id).order_by(func.random()).all()
-    number_of_reads_requested = int(len(all_sequence_ids_random_order) * percentage / 100)
-    if number_of_reads_requested < 1:
-        raise HTTPException(status_code=406, detail=f"{percentage}% results in less than 1 "
-                                                    f"out of {len(all_sequence_ids_random_order)}reads. T"
-                                                    f"here are not enough reads in the database yet. "
-                                                    f"Please add reads or choose higher percentage")
-    random_sequence_ids = all_sequence_ids_random_order[:number_of_reads_requested]
-    random_reads = []
-    for row in random_sequence_ids:
-        random_reads.append(await get_reads_by_sequence_id(row.sequence_id))
-    return random_reads'''
-
-
 @app.get('/random_x_percent/{percentage}',
          response_description="get x percent of all reads, randomly selected",
          status_code=status.HTTP_200_OK,
@@ -261,21 +242,6 @@ async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percent
     return return_list
 
 
-'''@app.get('/get_three_dimensions/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}',
-         response_description="get three dimensions of x percent of all reads",
-         response_model=list, status_code=status.HTTP_200_OK)
-async def get_three_dimensions(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
-    random_reads = await get_random_reads(percentage)#TODO: check dimension is in DB to prevent KeyError
-    return_list = []
-    for read in random_reads:
-        return_list.append({
-            'sequence_id': read['sequence_id'],  # hardcoded because needed for later referencing
-            dimension1_name: read[dimension1_name],
-            dimension2_name: read[dimension2_name],
-            dimension3_name: read[dimension3_name]
-        })
-    return return_list'''
-
 @app.get('/get_three_dimensions/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}',
          response_description="get three dimensions of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
@@ -321,28 +287,6 @@ async def post_binary_result(binary_result: SchemaBinaryResult):
     db.session.commit()
     return db_binary_result
 
-
-'''@app.get('/reads_by_seq_id/{sequence_id}', response_description="get read including adjacent binary entries")
-async def get_reads_by_sequence_id(sequence_id: Union[str]):
-    joined_data = db.session.query(ModelRawData, ModelBinaryResult).join(ModelRawData.binary_results) \
-        .filter(ModelRawData.sequence_id == sequence_id)
-
-    if joined_data.count() == 0:
-        return status.HTTP_404_NOT_FOUND
-
-    readObject = {'sequence_id': joined_data.first()[0].sequence_id,  # only returning the pretty data  <3
-                  'sequence': joined_data.first()[0].sequence,
-                  'sequence_length': joined_data.first()[0].sequence_length,
-                  'min_quality': joined_data.first()[0].min_quality,
-                  'max_quality': joined_data.first()[0].max_quality,
-                  'average_quality': joined_data.first()[0].average_quality,
-                  'phred_quality': typecast("list",joined_data.first()[0].phred_quality)#turn phred quality into list?
-                  #'phred_quality': joined_data.first()[0].phred_quality
-                  }
-    for entry in joined_data.all():  # now adding the binary_data entries for that read_object
-        readObject[entry[1].name] = typecast(entry[1].type, entry[1].value)
-
-    return readObject'''
 
 @app.get('/reads_by_seq_id/{sequence_id}', response_description="get read including adjacent binary entries")
 async def get_reads_by_sequence_id(sequence_id: Union[str]):
