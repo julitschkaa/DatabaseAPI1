@@ -34,7 +34,7 @@ def test_upload_kraken2():
 
 def test_get_read_by_id():
     random_id = os.environ['RANDOM_SEQ_ID']
-    response = client.get(f"/read_by_sequence_id/{random_id}")
+    response = client.get(f"/read_by_sequence_id/?sequence_id={random_id}")
     assert response.status_code == 200, f"Request failed with status {response.status_code}"
 
 
@@ -55,9 +55,9 @@ def test_get_all_dimensions():
         assert key in possible_dimension_keys
     assert len(response_body.keys()) == len(possible_dimension_keys)
 
-def test_get_randoom_x_percent():
+def test_get_random_x_percent():
     percentage = 50
-    response = client.get(f"/random_x_percent/{percentage}")
+    response = client.get(f"/random_x_percent/?percentage={percentage}")
     assert response.status_code == 200, f"Request failed with status {response.status_code}"
     read_count_response = client.get("/read_count/")
     read_count = read_count_response.json()
@@ -67,18 +67,19 @@ def test_get_randoom_x_percent():
 
 def test_get_one_dimension():
     percentage = 50
-    dimension = "YT"
-    response = client.get(f"get_one_dimension/{dimension}/{percentage}")
+    dimension1 = "YT"
+    response = client.get(f"one_dimension/?dimension1_name={dimension1}&percentage={percentage}")
     assert response.status_code == 200, f"Request failed with status {response.status_code}"
     response_body = response.json()
-    assert all([dimension in item.keys() for item in response_body]), f"not all items have {dimension}"
+    assert all([dimension1 in item.keys() for item in response_body]), f"not all items have {dimension1}"
 
 
 def test_get_two_dimensions(): #this test sucks in case one of the nested dimensions is called!!
     percentage = 50
     dimension1 = "max_quality"
     dimension2 = "mapping_qual"
-    response = client.get(f"/get_two_dimensions/{dimension1}/{dimension2}/{percentage}")
+    response = client.get(f"/two_dimensions/?dimension1_name={dimension1}"
+                          f"&dimension2_name={dimension2}&percentage={percentage}")
     assert response.status_code == 200, f"Request failed with status {response.status_code}"
     response_body = response.json()
     assert all([dimension1 in item.keys() and dimension2 in item.keys() for item in
@@ -90,7 +91,8 @@ def test_get_three_dimensions():
     dimension1 = "classified"
     dimension2 = "mapping_qual"
     dimension3 = "min_quality"
-    response = client.get(f"/get_three_dimensions/{dimension1}/{dimension2}/{dimension3}/{percentage}")
+    response = client.get(f"/three_dimensions/?dimension1_name={dimension1}&dimension2_name={dimension2}"
+                          f"&dimension3_name={dimension3}&percentage={percentage}")
     assert response.status_code == 200, f"Request failed with status {response.status_code}"
     response_body = response.json()
     assert all([dimension1 in item.keys() and dimension2 in item.keys() and dimension3 in item.keys() for item in

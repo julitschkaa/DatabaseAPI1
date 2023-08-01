@@ -149,7 +149,7 @@ async def get_read_count():
     read_count = len(db["all_docs"].distinct('sequence_id'))
     return read_count
 
-@app.get('/random_x_percent/{percentage}', response_description="get x percent of all reads, randomly selected",
+@app.get('/random_x_percent/', response_description="get x percent of all reads, randomly selected",
          status_code=status.HTTP_200_OK)
 async def get_random_reads(percentage: int):
     if percentage > 100:
@@ -172,10 +172,10 @@ async def get_random_reads(percentage: int):
         random_reads.append(await get_read_by_seq_id(sequence_id))#TODO: this is horribly slow :')
     return random_reads
 
-@app.get('/get_one_dimension/{dimension_name}/{percentage}',
+@app.get('/one_dimension/',
          response_description="get one dimension of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
-async def get_one_dimension(dimension_name: str, percentage: int):
+async def get_one_dimension(dimension1_name: str, percentage: int):
     if percentage > 100:
         raise HTTPException(status_code=406, detail=f"sorry, I can't get you more than 100% of all reads")
     read_count = await get_read_count()
@@ -187,9 +187,9 @@ async def get_one_dimension(dimension_name: str, percentage: int):
 
     # Build the aggregation pipeline
     pipeline = [
-        {"$match": {dimension_name: {"$exists": True}}},
+        {"$match": {dimension1_name: {"$exists": True}}},
         {"$sample": {"size": num_documents}},
-        {"$project": {"_id": 0, "sequence_id": "$sequence_id", dimension_name: f"${dimension_name}"}}
+        {"$project": {"_id": 0, "sequence_id": "$sequence_id", dimension1_name: f"${dimension1_name}"}}
     ]
 
     # Execute the aggregation pipeline
@@ -198,7 +198,7 @@ async def get_one_dimension(dimension_name: str, percentage: int):
     return result
 
 
-@app.get('/get_two_dimensions/{dimension1_name}/{dimension2_name}/{percentage}',
+@app.get('/two_dimensions/',
          response_description="get two dimensions of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
 async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percentage: int):
@@ -238,8 +238,7 @@ async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percent
     return result
 
 
-@app.get('/get_three_dimensions/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}',#TODO there is
-         # no exception if dimension_name doesn't exist
+@app.get('/three_dimensions/',#TODO there is no exception if dimension_name doesn't exist
          response_description="get three dimensions of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
 async def get_three_dimensions(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
@@ -316,7 +315,7 @@ async def create_documents(documents: List[Union[FastqReadModel, Bowtie2ResultMo
     return [str(id) for id in result.inserted_ids]
 
 
-@app.get('/read_by_sequence_id/{sequence_id}', response_description="get read_object. an object combined of all "
+@app.get('/read_by_sequence_id/', response_description="get read_object. an object combined of all "
                                                                     "document fields, matching a given sequence_id")
 async def get_read_by_seq_id(sequence_id: Union[str]):
     # Fetch all relevant documents in a single query
@@ -371,7 +370,7 @@ async def get_all_reads():
     return all_read_objects
 
 
-@app.get("/documents/", response_description="list all documents")
+@app.get("/all_documents/", response_description="list all documents")
 async def list_all_documents(page_size: int = Query(10, gt=0), page: int = Query(1, gt=0)):
     skip = (page - 1) * page_size
     documents = list(db["all_docs"].find().skip(skip).limit(page_size))
@@ -381,7 +380,7 @@ async def list_all_documents(page_size: int = Query(10, gt=0), page: int = Query
     return documents
 
 
-@app.get("/documents/{sequence_id}", response_description="get documents for a specific sequence_id",
+@app.get("/documents/", response_description="get documents for a specific sequence_id",
          response_model=list[Document])
 async def get_documents_by_id(sequence_id: str):
     documents: list[Document] = []
@@ -392,7 +391,7 @@ async def get_documents_by_id(sequence_id: str):
     raise HTTPException(status_code=404, detail=f"read {sequence_id} not found in database")
 
 
-@app.delete("/documents/{sequence_id}",
+@app.delete("/documents/",
             response_description="Delete all documents by sequence_id")  # bson.errors.InvalidDocument: cannot encode object: <built-in function id>, of type: <class 'builtin_function_or_method'>
 async def delete_document_by_id(sequence_id: str):
     deleted_documents_count = db["all_docs"].delete_many({"sequence_id": sequence_id}).deleted_count

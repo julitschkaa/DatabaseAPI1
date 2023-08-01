@@ -9,9 +9,9 @@ import timeit
 load_dotenv()#making .env variables availabe to os.getenv
 
 #naming file for benchmarking results
-benchmark_file = open('TrialMongoDB_2000reads_10runs_benchmarking.txt', 'w')
+benchmark_file = open('UNWICHTIGMongoDB_20reads_1runs_benchmarking.txt', 'w')
 #defining number of runs to be evaluated
-num_of_runs = 10
+num_of_runs = 1
 
 #getting environment variables
 fastq_file = os.getenv('PATH_TO_FASTQ')
@@ -34,19 +34,27 @@ post_kraken2_url = f"{base_url}/kraken2/?filepath={kraken_file}"
 delete_all_url = f"{base_url}/clear_all/"
 get_read_count_url = f"{base_url}/get_read_count/"
 get_dimensions_url = f"{base_url}/dimensions/"
-get_read_by_seq_id_url = f"{base_url}/read_by_sequence_id/{random_seq_id}"
+get_read_by_seq_id_url = f"{base_url}/read_by_sequence_id/?sequence_id={random_seq_id}"
 
-get_random_80_percent_url = f"{base_url}/random_x_percent/{random_80_percent}"
-get_random_100_percent_url = f"{base_url}/random_x_percent/{random_100_percent}"
+get_random_80_percent_url = f"{base_url}/random_x_percent/?percentage={random_80_percent}"
+get_random_100_percent_url = f"{base_url}/random_x_percent/?percentage={random_100_percent}"
 
-get_one_nested_dimension_80_url = f"{base_url}/get_one_dimension/{dimension1nested}/{random_80_percent}"
-get_one_nested_dimension_100_url = f"{base_url}/get_one_dimension/{dimension1nested}/{random_100_percent}"
-get_one_dimension_80_url = f"{base_url}/get_one_dimension/{dimension1}/{random_80_percent}"
-get_one_dimension_100_url = f"{base_url}/get_one_dimension/{dimension1}/{random_100_percent}"
-get_two_dimensions_80_url = f"{base_url}/get_two_dimensions/{dimension1}/{dimension2}/{random_80_percent}"
-get_two_dimensions_100_url = f"{base_url}/get_two_dimensions/{dimension1}/{dimension2}/{random_100_percent}"
-get_three_dimensions_80_url = f"{base_url}/get_three_dimensions/{dimension1}/{dimension2}/{dimension3}/{random_80_percent}"
-get_three_dimensions_100_url = f"{base_url}/get_three_dimensions/{dimension1}/{dimension2}/{dimension3}/{random_100_percent}"
+get_one_nested_dimension_80_url = (f"{base_url}/one_dimension/?dimension1_name={dimension1nested}"
+                                   f"&percentage={random_80_percent}")
+get_one_nested_dimension_100_url = (f"{base_url}/one_dimension/?dimension1_name={dimension1nested}"
+                                    f"&percentage={random_100_percent}")
+get_one_dimension_80_url = f"{base_url}/one_dimension/?dimension1_name={dimension1}&percentage={random_80_percent}"
+get_one_dimension_100_url = f"{base_url}/one_dimension/?dimension1_name={dimension1}&percentage={random_100_percent}"
+get_two_dimensions_80_url = (f"{base_url}/two_dimensions/?dimension1_name={dimension1}&dimension2_name={dimension2}"
+                             f"&percentage={random_80_percent}")
+get_two_dimensions_100_url = (f"{base_url}/two_dimensions/?dimension1_name={dimension1}&dimension2_name={dimension2}"
+                              f"&percentage={random_100_percent}")
+get_three_dimensions_80_url = (f"{base_url}/three_dimensions/?dimension1_name={dimension1}"
+                               f"&dimension2_name={dimension2}&dimension3_name={dimension3}"
+                               f"&percentage={random_80_percent}")
+get_three_dimensions_100_url = (f"{base_url}/three_dimensions/?dimension1_name={dimension1}"
+                                f"&dimension2_name={dimension2}&dimension3_name={dimension3}"
+                                f"&percentage={random_100_percent}")
 
 
 #wrapper is needed because timeit.repeat expects function without arguments
