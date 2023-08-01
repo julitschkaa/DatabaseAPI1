@@ -1,5 +1,5 @@
 # DatabaseAPI1
-##Postgres2-Prototyp
+## Postgres2-Prototyp
 Python API that reads .fastq and .sam files into three separate tables in a PostgreSQL DB.
 Current ERD: 
 ![three entity RD for postgres set up. seperate tables for data from fastq reads, sam files as well as kraken output 
@@ -11,9 +11,9 @@ to start:
 3. run ```alembic revision --autogenerate -m "New Migration"```
 4. ```alembic upgrade head```
 5. ```uvicorn main:app --reload --port 8080```
-![screenshot of three entity postgres API](images/main_endpoints.png "Screenshot of three entity postgres db API")
+![screenshot of all endpoints of postgres2](images/screenshot_endpoints_postgres2.png "Screenshot of all endpoints")
 6. now with added get dimensions endpoints.
-![screenshot of threedimensionendpoint](images/main_get_dimensions.png "return format of get dimensions endpoint")
+![screenshot of get dimensions endpoint](images/screenshot_get_dimensions_postgres2.png "return format of get dimensions endpoint")
 7. please keep in mind, that "phred_quality is saved as "string" here, 
 but is returned as list of ints in the actual endpoints
-![screenshot of threedimensionendpoint2](images/main_get_one_dimension.png "get one dimensions endpoint")
+![screenshot of three dimensions endpoint](images/screenshot_get_three_dimensions2_postgres2.png "get three dimensions endpoint")

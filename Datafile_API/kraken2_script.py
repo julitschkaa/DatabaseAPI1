@@ -11,6 +11,6 @@ def get_kraken_metrics(output:str):
         #classification["sequence_length"]=values[3] #already present in fastq-parser
         classification["lca_mapping_list"]=values[4].split(" ")
         classifications.append(classification)
-        if(len(classifications)==2000):
+        if(len(classifications)==20):
             break
     return classifications

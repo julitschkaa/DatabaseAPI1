@@ -11,16 +11,16 @@ def test_read_main():
     assert response.json() == {"message": "Hello World"}
 
 def test_delete_all_binaries():
-    response = client.delete("/delete_binary_results/")
+    response = client.delete("/binary_results/")
     assert response.status_code in [200,404]
 
 
 def test_delete_all_raw_data():
-    response = client.delete("/delete_raw_data/")
+    response = client.delete("/raw_data/")
     assert response.status_code in [200,404]
 
 def test_delete_all_filename_and_uuid():
-    response = client.delete("/delete_filename_and_uuid/")
+    response = client.delete("/filename_and_uuid/")
     assert response.status_code in [200,404]
     read_count_response = client.get("/read_count/")
     read_count = read_count_response.json()
@@ -43,7 +43,7 @@ def test_upload_kraken2():
 
 def test_get_read_by_id():
     random_id = os.environ['RANDOM_SEQ_ID']
-    response = client.get(f"/reads_by_seq_id/{random_id}")
+    response = client.get(f"/read_by_sequence_id/?sequence_id={random_id}")
     assert response.status_code == 200, f"Request failed with status {response.status_code}"
 
 
@@ -63,9 +63,9 @@ def test_get_all_dimensions():
         assert key in possible_dimension_keys
     assert len(response_body.keys()) == len(possible_dimension_keys)
 
-def test_get_randoom_x_percent():
+def test_get_random_x_percent():
     percentage = 50
-    response = client.get(f"/random_x_percent/{percentage}")
+    response = client.get(f"/random_x_percent/?percentage={percentage}")
     assert response.status_code == 200, f"Request failed with status {response.status_code}"
     read_count_response = client.get("/read_count/")
     read_count = read_count_response.json()
@@ -75,7 +75,7 @@ def test_get_randoom_x_percent():
 def test_get_one_dimension():
     percentage = 50
     dimension = "YT"
-    response = client.get(f"/get_one_dimension/{dimension}/{percentage}")
+    response = client.get(f"/one_dimension/?dimension1_name={dimension}&percentage={percentage}")
     response_body = response.json()
     assert response.status_code == 200, f"Request failed with status {response.status_code}"
     assert all ([dimension in item.keys() for item in response_body]), "not all items have the requested dimension"
@@ -85,7 +85,7 @@ def test_get_two_dimensions():
     percentage = 50
     dimension1 = "YT"
     dimension2 = "mapping_qual"
-    response = client.get(f"/get_two_dimensions/{dimension1}/{dimension2}/{percentage}")
+    response = client.get(f"/two_dimensions/?dimension1_name={dimension1}&dimension2_name={dimension2}&percentage={percentage}")
     response_body = response.json()
     assert all([dimension1 in item.keys() and dimension2 in item.keys() for item in
               response_body]), "Not all items have both 'dimension1' and 'dimension2'"
@@ -97,7 +97,7 @@ def test_get_three_dimensions():
     dimension1 = "YT"
     dimension2 = "mapping_qual"
     dimension3 = "min_quality"
-    response = client.get(f"/get_three_dimensions/{dimension1}/{dimension2}/{dimension3}/{percentage}")
+    response = client.get(f"/three_dimensions/?dimension1_name={dimension1}&dimension2_name={dimension2}&dimension3_name={dimension3}&percentage={percentage}")
     response_body = response.json()
 
     assert all([dimension1 in item.keys() and dimension2 in item.keys() and dimension3 in item.keys() for item in

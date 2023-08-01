@@ -21,6 +21,6 @@ def get_fastq_metrics(filename):
         read["average_quality"] = sum(record.letter_annotations["phred_quality"]) / len(record.letter_annotations["phred_quality"])
         read["phred_quality"] = record.letter_annotations["phred_quality"]
         reads.append(read)
-        if(len(reads)==2000):
+        if(len(reads)==20):
             break
     return reads

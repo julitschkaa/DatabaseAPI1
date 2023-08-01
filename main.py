@@ -161,7 +161,7 @@ async def list_all_possible_dimensions():
     return combined_data_dimensions
 
 
-@app.get('/random_x_percent/{percentage}',
+@app.get('/random_x_percent/',
          response_description="get x percent of all reads, randomly selected",
          status_code=status.HTTP_200_OK,
          response_model=list)
@@ -189,7 +189,7 @@ async def get_random_reads(percentage: int):
     return [await get_reads_by_sequence_id(id[0]) for id in random_sequence_ids]
 
 
-@app.get('/random_x_percent_TABLESAMPLE_SYSTEM/{percentage}',
+@app.get('/random_x_percent_TABLESAMPLE_SYSTEM/',
          response_description="get x percent of all reads, randomly selected",
          status_code=status.HTTP_200_OK,
          response_model=list)
@@ -213,21 +213,21 @@ async def get_random_reads(percentage: int):
     return random_reads
 
 
-@app.get('/get_one_dimension/{dimension_name}/{percentage}',
+@app.get('/one_dimension/',
          response_description="get one dimension of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
-async def get_one_dimension(dimension_name: str, percentage: int):
+async def get_one_dimension(dimension1_name: str, percentage: int):
     random_reads = await get_random_reads(percentage)
     return_list = []
     for read in random_reads:
         return_list.append({
             'sequence_id': read['sequence_id'],  # hardcoded because needed for later referencing
-            dimension_name: read[dimension_name]
+            dimension1_name: read[dimension1_name]
         })
     return return_list
 
 
-@app.get('/get_two_dimensions/{dimension1_name}/{dimension2_name}/{percentage}',
+@app.get('/two_dimensions/',
          response_description="get two dimensions of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
 async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percentage: int):
@@ -242,7 +242,7 @@ async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percent
     return return_list
 
 
-@app.get('/get_three_dimensions/{dimension1_name}/{dimension2_name}/{dimension3_name}/{percentage}',
+@app.get('/three_dimensions/',
          response_description="get three dimensions of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
 async def get_three_dimensions(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
@@ -279,16 +279,16 @@ async def post_raw_data(raw_data: SchemaRawData):
     , response_model=SchemaBinaryResult, status_code=status.HTTP_201_CREATED)
 async def post_binary_result(binary_result: SchemaBinaryResult):
     db_binary_result = ModelRawData(sequence_id=binary_result.sequence_id,
-                                     type=binary_result.type,
-                                     name=binary_result.name,
-                                     value=binary_result.value,
-                                     file_id=create_file_name_and_uuid_entries)
+                                    type=binary_result.type,
+                                    name=binary_result.name,
+                                    value=binary_result.value,
+                                    file_id=create_filename_and_uuid_entries)
     db.session.add(db_binary_result)
     db.session.commit()
     return db_binary_result
 
 
-@app.get('/reads_by_seq_id/{sequence_id}', response_description="get read including adjacent binary entries")
+@app.get('/read_by_sequence_id/', response_description="get read including adjacent binary entries")
 async def get_reads_by_sequence_id(sequence_id: Union[str]):
     joined_data = db.session.query(ModelRawData, ModelBinaryResult).join(ModelRawData.binary_results) \
         .filter(ModelRawData.sequence_id == sequence_id).all()
@@ -324,7 +324,7 @@ async def list_raw_data_entries():
     return raw_data
 
 
-@app.delete('/raw_data_by_id/{sequence_id}', response_description="delete all entries in raw_data table")
+@app.delete('/raw_data_by_id/', response_description="delete all entries in raw_data table")
 async def delete_raw_data(sequence_id: Union[str]):
     to_be_deleted = db.session.query(ModelRawData).filter(ModelRawData.sequence_id == sequence_id).first()
     await delete_binary_results_by_id(sequence_id)
@@ -335,7 +335,7 @@ async def delete_raw_data(sequence_id: Union[str]):
     return status.HTTP_200_OK
 
 
-@app.delete('/binary_results_by_id/{sequence_id}',
+@app.delete('/binary_results_by_id/',
             response_description="delete all entries with matching id in binary_results table")
 async def delete_binary_results_by_id(sequence_id: Union[str]):
     to_be_deleted_list = await list_binary_results(sequence_id)
@@ -347,7 +347,7 @@ async def delete_binary_results_by_id(sequence_id: Union[str]):
     return status.HTTP_200_OK
 
 
-@app.delete('/delete_binary_results/', response_description="delete all entries in binary_results table")
+@app.delete('/binary_results/', response_description="delete all entries in binary_results table")
 async def delete_all_binary_results():  # TODO add exceptionhandling and better return status
     modifiedcount = db.session.query(ModelBinaryResult).delete()
     if modifiedcount < 1:
@@ -356,7 +356,7 @@ async def delete_all_binary_results():  # TODO add exceptionhandling and better 
     return status.HTTP_200_OK
 
 
-@app.delete('/delete_raw_data/', response_description="delete all entries in raw_data table")
+@app.delete('/raw_data/', response_description="delete all entries in raw_data table")
 async def delete_all_raw_data():  # TODO add exceptionhandling and better return status
     modified_count = db.session.query(ModelRawData).delete()
     if modified_count < 1:
@@ -374,7 +374,7 @@ async def delete_all_filename_and_uuid():
     return status.HTTP_200_OK
 
 
-@app.get('/binary_results_by_seq_id/',
+@app.get('/binary_results_by_sequence_id/',
          response_description="list all reads with matching seq_id in binary_results table",
          response_model=List[SchemaBinaryResult])
 async def list_binary_results(sequence_id: Union[str]):
@@ -386,18 +386,18 @@ async def list_binary_results(sequence_id: Union[str]):
     return binary_results
 
 
-@app.get('/file_name_and_uuid/', response_description="list all entries in file_name_and_id",
+@app.get('/filename_and_uuid/', response_description="list all entries in file_name_and_id",
          response_model=List[SchemaFileNameAndUuid])
-async def list_file_name_and_uuid():
+async def list_filename_and_uuid():
     file_name_and_uuids = db.session.query(ModelFileNamAndUuid).all()
     if not file_name_and_uuids:
         raise HTTPException(status_code=204, detail="no entries in file_name_uuid found")
     return file_name_and_uuids
 
 
-@app.post('/file_name_and_uuid/', response_description="write entries to file_name_and_id table",
+@app.post('/filename_and_uuid/', response_description="write entries to file_name_and_id table",
           response_model=SchemaFileNameAndUuid, status_code=status.HTTP_201_CREATED)
-async def create_file_name_and_uuid_entries(file_name_and_uuid: SchemaFileNameAndUuid):
+async def create_filename_and_uuid_entries(file_name_and_uuid: SchemaFileNameAndUuid):
     db_file_name_and_uuid = ModelFileNamAndUuid(file_name=file_name_and_uuid.name,
                                                 file_uuid=file_name_and_uuid.uuid)
     db.session.add(db_file_name_and_uuid)
