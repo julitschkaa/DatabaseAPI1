@@ -1,5 +1,5 @@
 # DatabaseAPI1
-##Postgres1_Prototyp  
+## Postgres1_Prototyp  
 Python API that reads .fastq and .sam as well as krakenOutput.txt files into a simplified PostgreSQL DB.
 original file name is saved in file_name_and_uuid table, all reads/aligments/classification "data-points" are split up into seperate
 "binary-results" and saved in respective table.
