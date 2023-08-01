@@ -126,7 +126,7 @@ async def get_read_count():
     read_count = db.session.query(ModelBinaryResult.sequence_id).distinct().count()
     return read_count
 
-@app.get("/random_x_percent_ids/{percentage}", response_description="get x percent of all sequence_ids, random order",
+@app.get('/random_x_percent_ids/', response_description="get x percent of all sequence_ids, random order",
          status_code=status.HTTP_200_OK)
 async def get_random_ids(percentage: int):
     if percentage > 100:
@@ -145,7 +145,7 @@ async def get_random_ids(percentage: int):
         random_reads.append(row[0])
     return random_reads
 
-@app.get('/random_x_percent/{percentage}', response_description="get x percent of all reads, randomly selected",
+@app.get('/random_x_percent/', response_description="get x percent of all reads, randomly selected",
          status_code=status.HTTP_200_OK)
 async def get_random_reads(percentage: int):
     if percentage > 100:
@@ -165,7 +165,7 @@ async def get_random_reads(percentage: int):
     return random_reads
 
 
-@app.get('/get_one_dimension/', response_description="get one dimension of x percent of all reads",
+@app.get('/one_dimension/', response_description="get one dimension of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
 async def get_one_dimension(dimension_name: str, percentage: int):
     random_ids = await get_random_ids(percentage)
@@ -190,7 +190,7 @@ async def get_one_dimension(dimension_name: str, percentage: int):
 
 
 
-@app.get('/get_two_dimensions/', response_description="get two dimensions of x percent of all reads",
+@app.get('/two_dimensions/', response_description="get two dimensions of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
 async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percentage: int):
     random_ids = await get_random_ids(percentage)
@@ -220,7 +220,7 @@ async def get_two_dimensions(dimension1_name: str, dimension2_name: str, percent
         for id in random_ids #if id in results_by_id_and_dimension
     ]
 
-@app.get('/get_three_dimensions/', response_description="get three dimensions of x percent of all reads",
+@app.get('/three_dimensions/', response_description="get three dimensions of x percent of all reads",
          response_model=list, status_code=status.HTTP_200_OK)
 async def get_three_dimensions(dimension1_name: str, dimension2_name: str, dimension3_name: str, percentage: int):
     random_ids = await get_random_ids(percentage)
@@ -259,7 +259,7 @@ async def post_binary_result(binary_result: SchemaBinaryResult):
                                          type=binary_result.type,
                                          name=binary_result.name,
                                          value=binary_result.value,
-                                         file_id=create_file_name_and_uuid_entry)
+                                         file_id=create_filename_and_uuid_entry)
     db.session.add(db_binary_result)
     db.session.commit()
     return db_binary_result
@@ -271,7 +271,7 @@ async def post_binary_results(binary_results: List[SchemaBinaryResult]):
     db.session.commit()
     return status.HTTP_201_CREATED
 
-@app.delete('/binary_results_by_id/{sequence_id}', response_description="delete all entries with matching id "
+@app.delete('/binary_results_by_id/', response_description="delete all entries with matching id "
                                                                         "in binary_results table")
 async def delete_binary_results_by_id(sequence_id: Union[str]):
     to_be_deleted_list = await list_binary_results(sequence_id)
@@ -282,7 +282,7 @@ async def delete_binary_results_by_id(sequence_id: Union[str]):
     db.session.commit()
     return status.HTTP_200_OK
 
-@app.delete('/delete_binary_results/', response_description="delete all entries in binary_results table")
+@app.delete('/binary_results/', response_description="delete all entries in binary_results table")
 async def delete_all_binary_results():#TODO add exceptionhandling and better return status
     modifiedcount = db.session.query(ModelBinaryResult).delete()
     if modifiedcount < 1:
@@ -324,18 +324,18 @@ async def list_binary_results():
     return binary_results
 
 
-@app.get('/file_name_and_uuid/', response_description="list all entries in file_name_and_id",
+@app.get('/filename_and_uuid/', response_description="list all entries in file_name_and_id",
          response_model=List[SchemaFileNameAndUuid])
-async def list_file_name_and_uuid():
+async def list_filename_and_uuid():
     file_name_and_uuids = db.session.query(ModelFileNameAndUuid).all()
     if not file_name_and_uuids:
         raise HTTPException(status_code=204, detail="no entries in file_name_uuid found")
     return file_name_and_uuids
 
 
-@app.post('/file_name_and_uuid/', response_description="write entries to file_name_and_id table",
+@app.post('/filename_and_uuid/', response_description="write entries to file_name_and_id table",
           response_model=SchemaFileNameAndUuid, status_code=status.HTTP_201_CREATED)
-async def create_file_name_and_uuid_entry(db_file_name_and_uuid: SchemaFileNameAndUuid):
+async def create_filename_and_uuid_entry(db_file_name_and_uuid: SchemaFileNameAndUuid):
     db.session.add(db_file_name_and_uuid)
     db.session.commit()
     return db_file_name_and_uuid
@@ -346,7 +346,7 @@ async def create_fastq_entries(filepath: Union[str]):
     file_name_and_uuid = ModelFileNameAndUuid(file_name=filepath,
                                               binary_of_origin="fastq",
                                               file_uuid=uuid4())
-    db_file_name_and_uuid = await create_file_name_and_uuid_entry(file_name_and_uuid)
+    db_file_name_and_uuid = await create_filename_and_uuid_entry(file_name_and_uuid)
     fastq_id = db_file_name_and_uuid.id #get insertion id of file_name object in postgresdb
 
     reads = get_fastq_metrics(filepath)

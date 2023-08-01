@@ -13,6 +13,6 @@ to start:
 4. ```alembic upgrade head```
 5. ```uvicorn main:app --reload --port 8080```
 
-![endpoints for simplified postgres API](images/simpler_postgres_endpoints.png "screenshot of api endpoints")
-![get 3 dimension endpoint screensho1](images/simpler_postgres_dimension_endpoint.png "schreenshot1 of get 1 dimension endpoint")
-![get 3 dimension endpoint screenshot2](images/simpler_postgres_get_two_dimensions_endpoint.png "sreenshot2 of get 2 dimensions endpoint")
+![endpoints for simplified postgres API](images/postgres1_prototyp_endpoints.png "screenshot of api endpoints")
+![get 3 dimension endpoint screensho1](images/postgres1_prototyp_get_dimensions.png "screenshot1 of get all dimensions endpoint")
+![get 3 dimension endpoint screenshot2](images/postgres1_prototyp_get_one_dimension.png "sreenshot2 of get 1 dimension endpoint")

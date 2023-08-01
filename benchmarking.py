@@ -8,9 +8,9 @@ import timeit
 load_dotenv()#making .env variables availabe to os.getenv
 
 #naming file for benchmarking results
-benchmark_file = open('simpler_postgres_2000reads_10runs_benchmarking.txt', 'w')
+benchmark_file = open('UNWICHTIGsimpler_postgres_20reads_1runs_benchmarking.txt', 'w')
 #defining number of runs to be evaluated
-num_of_runs = 10
+num_of_runs = 1
 
 #getting environment variables
 fastq_file = os.getenv('PATH_TO_2000FASTQ')
@@ -35,20 +35,20 @@ get_read_count_url = f"{base_url}/read_count/"
 get_dimensions_url = f"{base_url}/dimensions/"
 get_read_by_seq_id_url = f"{base_url}/read_by_sequence_id/?sequence_id={random_seq_id}"
 
-get_random_80_percent_url = f"{base_url}/random_x_percent/{random_80_percent}"
-get_random_100_percent_url = f"{base_url}/random_x_percent/{random_100_percent}"
+get_random_80_percent_url = f"{base_url}/random_x_percent/?percentage={random_80_percent}"
+get_random_100_percent_url = f"{base_url}/random_x_percent/?percentage={random_100_percent}"
 
-get_one_dimension_80_url = f"{base_url}/get_one_dimension/?dimension_name={dimension1}&percentage={random_80_percent}"
-get_one_dimension_100_url = f"{base_url}/get_one_dimension/?dimension_name={dimension1}" \
+get_one_dimension_80_url = f"{base_url}/one_dimension/?dimension_name={dimension1}&percentage={random_80_percent}"
+get_one_dimension_100_url = f"{base_url}/one_dimension/?dimension_name={dimension1}" \
                             f"&percentage={random_100_percent}"
-get_two_dimensions_80_url = f"{base_url}/get_two_dimensions/?dimension1_name={dimension1}&dimension2_name={dimension2}" \
+get_two_dimensions_80_url = f"{base_url}/two_dimensions/?dimension1_name={dimension1}&dimension2_name={dimension2}" \
                             f"&percentage={random_80_percent}"
-get_two_dimensions_100_url = f"{base_url}/get_two_dimensions/?dimension1_name={dimension1}&dimension2_name={dimension2}" \
+get_two_dimensions_100_url = f"{base_url}/two_dimensions/?dimension1_name={dimension1}&dimension2_name={dimension2}" \
                              f"&percentage={random_100_percent}"
-get_three_dimensions_80_url = f"{base_url}/get_three_dimensions/?dimension1_name={dimension1}" \
+get_three_dimensions_80_url = f"{base_url}/three_dimensions/?dimension1_name={dimension1}" \
                               f"&dimension2_name={dimension2}&dimension3_name={dimension3}" \
                               f"&percentage={random_80_percent}"
-get_three_dimensions_100_url = f"{base_url}/get_three_dimensions/?dimension1_name={dimension1}" \
+get_three_dimensions_100_url = f"{base_url}/three_dimensions/?dimension1_name={dimension1}" \
                                f"&dimension2_name={dimension2}&dimension3_name={dimension3}" \
                                f"&percentage={random_100_percent}"
 
