@@ -10,6 +10,6 @@ def get_kraken_metrics(output:str):
         classification["taxonomy_id"]=values[2]
         classification["lca_mapping_list"]=values[4].split(" ")
         classifications.append(classification)
-        if(len(classifications)==2000):
+        if(len(classifications)==20):
             break
     return classifications
