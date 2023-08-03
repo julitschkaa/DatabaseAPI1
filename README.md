@@ -4,7 +4,7 @@ Python API that reads .fastq and .sam as well as krakenOutput.txt files into a s
 original file name is saved in file_name_and_uuid table, all reads/aligments/classification "data-points" are split up into seperate
 "binary-results" and saved in respective table.
 Current ERD: 
-![three entity RD for postgres set up. separate tables for data from fastq reads, sam files as well as kraken output together, and file_id table](images/simpler_postgres_erd.png "ERD for the simplified postgresDB")
+![three entity RD for postgres set up. separate tables for data from fastq reads, sam files as well as kraken output together, and file_id table](images/postgresDBV1ERD.png "ERD for the simplified postgresDB")
 
 to start: 
 1. run ``pip install -r requirements.txt``
