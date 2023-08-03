@@ -3,7 +3,7 @@
 Python API that reads .fastq reads , bowtie2 aligments or kraken2 classifiactions as seperate documents into Mongo-DB. 
 The database accepts all different documents into one single collection. however, 
 for every new data/file format a new model, schema and endpoint has to be implemented.
-Current ERD: 
+Current Collection-Diagram: 
 ![one single table: all different kinds of documtens inserted](images/mongoDBV1ERD.png "data model for MongoDB")
 
 to start:  
