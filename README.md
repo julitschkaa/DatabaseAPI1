@@ -4,7 +4,7 @@ Python API that reads .fastq reads , bowtie2 aligments or kraken2 classifiaction
 The database accepts all different documents into one single collection. however, 
 for every new data/file format a new model, schema and endpoint has to be implemented.
 Current ERD: 
-![one single table: all different kinds of documtens inserted](images/actualflatfilemongodb.png "data model for MongoDB")
+![one single table: all different kinds of documtens inserted](images/mongoDBV1ERD.png "data model for MongoDB")
 
 to start:  
 1. ``pip install -r requirements.txt```
