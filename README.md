@@ -3,7 +3,7 @@
 Python API that reads .fastq and .sam files into three separate tables in a PostgreSQL DB.
 Current ERD: 
 ![three entity RD for postgres set up. seperate tables for data from fastq reads, sam files as well as kraken output 
-together, and file_id table](images/postgresV1.png "ERD for postgresDB")
+together, and file_id table](images/postgresDBV2ERD.png "ERD for postgresDB")
 
 to start:  
 1. run ``pip install -r requirements.txt``
